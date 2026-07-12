@@ -1,0 +1,191 @@
+import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
+
+const prisma = new PrismaClient();
+
+const CHECKLIST_ITEMS = [
+  { key: 'MAIN_ELECTRICITY', label: 'Main Electricity Supply Working' },
+  { key: 'LIFT', label: 'Lift Working' },
+  { key: 'WIFI', label: 'WiFi Working' },
+  { key: 'CCTV', label: 'CCTV Working' },
+  { key: 'FIRE_SAFETY', label: 'Fire Safety System Working' },
+  { key: 'RO_WATER', label: 'RO Water Available' },
+  { key: 'PARKING_CLEAN', label: 'Parking Area Clean' },
+  { key: 'HOUSEKEEPING', label: 'Housekeeping Status' },
+  { key: 'BOREWELL', label: 'Borewell Status' },
+  { key: 'GENERATOR_DIESEL', label: 'Generator Diesel Stock Checked' },
+];
+
+function startOfDay(d: Date): Date {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+function addDays(d: Date, n: number): Date {
+  const x = new Date(d);
+  x.setDate(x.getDate() + n);
+  return x;
+}
+
+async function hash(pw: string) {
+  return bcrypt.hash(pw, await bcrypt.genSalt(10));
+}
+
+async function main() {
+  console.log('Seeding database...');
+
+  // ─── Users ──────────────────────────────────────────────
+  const users = [
+    { name: 'Admin User', email: 'admin@hotelkesari.com', password: 'Admin@123', role: 'ADMIN', department: 'Management' },
+    { name: 'Front Office', email: 'frontoffice@hotelkesari.com', password: 'Front@123', role: 'FRONT_OFFICE', department: 'Front Office' },
+    { name: 'Revenue Team', email: 'revenue@hotelkesari.com', password: 'Revenue@123', role: 'REVENUE', department: 'Revenue' },
+    { name: 'Management', email: 'management@hotelkesari.com', password: 'Manage@123', role: 'MANAGEMENT', department: 'Management' },
+  ];
+
+  const created: Record<string, string> = {};
+  for (const u of users) {
+    const user = await prisma.user.upsert({
+      where: { email: u.email },
+      update: {},
+      create: {
+        name: u.name,
+        email: u.email,
+        passwordHash: await hash(u.password),
+        role: u.role,
+        department: u.department,
+      },
+    });
+    created[u.role] = user.id;
+  }
+  console.log(`  ✓ ${users.length} users`);
+
+  const frontOfficeId = created['FRONT_OFFICE'];
+
+  // ─── Sample daily reports (last 3 days) ─────────────────
+  const existingReports = await prisma.dailyReport.count();
+  if (existingReports === 0) {
+    for (let i = 0; i < 3; i++) {
+      const reportDate = startOfDay(addDays(new Date(), -i));
+      await prisma.dailyReport.create({
+        data: {
+          reportDate,
+          employeeId: frontOfficeId,
+          employeeName: 'Front Office',
+          department: 'Front Office',
+          remarks: i === 0 ? 'All systems nominal.' : null,
+          gensetChecks: {
+            create: [
+              { type: 'MORNING', status: 'WORKING', fuelLevel: 'FULL', employeeName: 'Front Office' },
+              { type: 'EVENING', status: 'WORKING', fuelLevel: 'MEDIUM', employeeName: 'Front Office' },
+            ],
+          },
+          waterTankChecks: {
+            create: [
+              { slot: 'SLOT_0700', status: 'FULL', employeeName: 'Front Office' },
+              { slot: 'SLOT_1200', status: 'MEDIUM', employeeName: 'Front Office' },
+              { slot: 'SLOT_1600', status: 'MEDIUM', employeeName: 'Front Office' },
+              { slot: 'SLOT_2100', status: 'FULL', employeeName: 'Front Office' },
+            ],
+          },
+          checklistItems: {
+            create: CHECKLIST_ITEMS.map((c) => ({
+              key: c.key,
+              label: c.label,
+              status: c.key === 'HOUSEKEEPING' || c.key === 'BOREWELL' ? 'OK' : 'OK',
+            })),
+          },
+          complaints:
+            i === 0
+              ? { create: [{ details: 'AC not cooling in room 204', guestName: 'R. Sharma', status: 'OPEN' }] }
+              : undefined,
+          maintenance:
+            i === 1
+              ? { create: [{ details: 'Lift door sensor intermittent', priority: 'HIGH', status: 'OPEN' }] }
+              : undefined,
+          incidents:
+            i === 0
+              ? { create: [{ type: 'LOST_FOUND', details: 'Black umbrella found in lobby' }] }
+              : undefined,
+        },
+      });
+    }
+    console.log('  ✓ 3 daily reports');
+  }
+
+  // ─── Reviews ────────────────────────────────────────────
+  const reviewCount = await prisma.review.count();
+  if (reviewCount === 0) {
+    const reviews = [
+      { source: 'GOOGLE', rating: 5, text: 'Excellent stay, great service.', author: 'Anita K.' },
+      { source: 'GOOGLE', rating: 4, text: 'Clean rooms, friendly staff.', author: 'Rahul M.' },
+      { source: 'OTA', rating: 3, text: 'Decent, but breakfast was limited.', author: 'Booking guest' },
+      { source: 'OTA', rating: 5, text: 'Loved the location!', author: 'S. Verma' },
+      { source: 'GOOGLE', rating: 2, text: 'Slow check-in process.', author: 'Verified guest' },
+    ];
+    for (let i = 0; i < reviews.length; i++) {
+      await prisma.review.create({
+        data: { ...reviews[i], reviewedAt: addDays(new Date(), -i * 2) },
+      });
+    }
+    console.log(`  ✓ ${reviews.length} reviews`);
+  }
+
+  // ─── Revenue + bookings (last 30 days) ──────────────────
+  const revCount = await prisma.revenueRecord.count();
+  if (revCount === 0) {
+    const roomsAvailable = 40;
+    for (let i = 0; i < 30; i++) {
+      const recordDate = startOfDay(addDays(new Date(), -i));
+      const seed = recordDate.getDate() + recordDate.getMonth() * 31;
+      const roomsSold = 18 + (seed % 20);
+      const adr = 2800 + (seed % 12) * 80;
+      const revenue = roomsSold * adr;
+      await prisma.revenueRecord.create({
+        data: {
+          recordDate,
+          revenue,
+          roomsSold,
+          roomsAvailable,
+          adr: +(revenue / roomsSold).toFixed(2),
+          revpar: +(revenue / roomsAvailable).toFixed(2),
+          source: 'PMS',
+        },
+      });
+      const sources = ['OTA', 'DIRECT', 'WALK_IN', 'CORPORATE'];
+      for (let j = 0; j < 4; j++) {
+        await prisma.booking.create({
+          data: {
+            bookingDate: recordDate,
+            source: sources[j],
+            status: j === 3 && seed % 5 === 0 ? 'CANCELLED' : 'CONFIRMED',
+            roomsBooked: Math.max(1, Math.round(roomsSold / 4)),
+            amount: revenue / 4,
+          },
+        });
+      }
+    }
+    console.log('  ✓ 30 days revenue + bookings');
+  }
+
+  // ─── Revenue target (current month) ─────────────────────
+  const now = new Date();
+  await prisma.revenueTarget.upsert({
+    where: { year_month: { year: now.getFullYear(), month: now.getMonth() + 1 } },
+    update: {},
+    create: { year: now.getFullYear(), month: now.getMonth() + 1, targetRevenue: 2500000 },
+  });
+  console.log('  ✓ revenue target');
+
+  console.log('Seed complete.\n');
+  console.log('  Login accounts:');
+  users.forEach((u) => console.log(`    ${u.role.padEnd(13)} ${u.email}  /  ${u.password}`));
+}
+
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

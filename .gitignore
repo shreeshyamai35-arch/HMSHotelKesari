@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build output
+dist/
+**/dist/
+build/
+
+# Environment / secrets  (NEVER commit these)
+.env
+.env.*
+!.env.example
+!.env.docker.example
+
+# Local SQLite dev database
+*.db
+*.db-journal
+**/prisma/dev.db*
+
+# Logs
+*.log
+**/*.log
+
+# Generated PDFs (dev)
+backend/storage/pdf/*
+!backend/storage/pdf/.gitkeep
+
+# OS / editor
+.DS_Store
+Thumbs.db

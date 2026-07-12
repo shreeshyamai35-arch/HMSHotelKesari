@@ -1,0 +1,74 @@
+# ─────────────────────────────────────────────────────────────
+# Render Blueprint — Hotel Kesari (test deployment)
+# Deploys: Postgres DB + Node/Express API (Docker) + React static site.
+#
+# HOW TO DEPLOY:
+#   1. Push this repo to GitHub.
+#   2. Render Dashboard → New → Blueprint → connect the repo.
+#   3. Render reads this file and creates all three resources.
+#   4. First deploy seeds demo data (SEED_ON_START=true). After it's up,
+#      set SEED_ON_START=false on the kesari-api service and redeploy.
+#
+# NOTE: the static site rewrites /api/* to the API service below. If Render
+# assigns the API a different hostname (name collision), update the
+# `destination` URL in the routes section to match the API's real URL.
+# ─────────────────────────────────────────────────────────────
+
+databases:
+  - name: kesari-db
+    databaseName: kesari
+    user: kesari
+    plan: free
+
+services:
+  # ─── Backend API (Docker) ───────────────────────────────
+  - type: web
+    name: kesari-api
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: DATABASE_URL
+        fromDatabase:
+          name: kesari-db
+          property: connectionString
+      - key: SEED_ON_START
+        value: "true" # set to "false" after the first successful deploy
+      - key: CORS_ORIGIN
+        value: "*" # test only — tighten to the web URL for production
+      - key: ENABLE_CRON
+        value: "true"
+      - key: CHECK_GRACE_MINUTES
+        value: "60"
+      - key: AI_PROVIDER
+        value: mock
+      - key: PMS_PROVIDER
+        value: mock
+
+  # ─── Frontend (static React build) ──────────────────────
+  - type: web
+    name: kesari-web
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    routes:
+      # Proxy API calls to the backend (same-origin → no CORS needed).
+      - type: rewrite
+        source: /api/*
+        destination: https://kesari-api.onrender.com/api/*
+      # SPA history fallback.
+      - type: rewrite
+        source: /*
+        destination: /index.html

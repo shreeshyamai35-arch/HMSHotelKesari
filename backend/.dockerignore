@@ -1,0 +1,13 @@
+node_modules
+dist
+npm-debug.log
+*.log
+.env
+.env.*
+!.env.example
+prisma/dev.db
+prisma/dev.db-journal
+storage/pdf/*
+!storage/pdf/.gitkeep
+.git
+.gitignore

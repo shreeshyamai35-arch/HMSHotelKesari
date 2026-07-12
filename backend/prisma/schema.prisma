@@ -1,0 +1,291 @@
+// Hotel Kesari — Prisma schema
+// Portable across SQLite (dev) and PostgreSQL (prod).
+// To use PostgreSQL: set provider = "postgresql" and DATABASE_URL accordingly.
+// Enums are stored as strings (validated in the app layer) to keep the schema
+// portable across both engines.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────── Users ───────────────────────────────
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         String   @default("FRONT_OFFICE") // ADMIN | FRONT_OFFICE | REVENUE | MANAGEMENT
+  department   String?
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  reports       DailyReport[]
+  notifications Notification[]
+}
+
+// ────────────────────────── Daily Operations ─────────────────────────
+model DailyReport {
+  id             String   @id @default(uuid())
+  reportDate     DateTime
+  employeeId     String
+  employeeName   String
+  department     String?
+  submittedAt    DateTime @default(now())
+  remarks        String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  employee User @relation(fields: [employeeId], references: [id])
+
+  gensetChecks    GensetCheck[]
+  waterTankChecks WaterTankCheck[]
+  checklistItems  ChecklistItem[]
+  complaints      Complaint[]
+  maintenance     MaintenanceIssue[]
+  incidents       Incident[]
+  pdfReports      PdfReport[]
+
+  @@index([reportDate])
+  @@index([employeeId])
+}
+
+model GensetCheck {
+  id           String   @id @default(uuid())
+  reportId     String
+  type         String   // MORNING | EVENING
+  status       String   // WORKING | NOT_WORKING
+  fuelLevel    String   // FULL | MEDIUM | LOW
+  remarks      String?
+  employeeName String
+  checkedAt    DateTime @default(now())
+
+  report DailyReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+}
+
+model WaterTankCheck {
+  id           String   @id @default(uuid())
+  reportId     String
+  slot         String   // SLOT_0700 | SLOT_1200 | SLOT_1600 | SLOT_2100
+  status       String   // FULL | MEDIUM | LOW
+  remarks      String?
+  employeeName String
+  checkedAt    DateTime @default(now())
+
+  report DailyReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+}
+
+model ChecklistItem {
+  id       String  @id @default(uuid())
+  reportId String
+  key      String  // e.g. MAIN_ELECTRICITY, LIFT, WIFI ...
+  label    String
+  status   String  // OK | NOT_OK | NA  (or descriptive value for housekeeping/borewell)
+  remarks  String?
+
+  report DailyReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+}
+
+model Complaint {
+  id          String    @id @default(uuid())
+  reportId    String?
+  details     String
+  guestName   String?
+  status      String    @default("OPEN") // OPEN | CLOSED
+  createdAt   DateTime  @default(now())
+  resolvedAt  DateTime?
+
+  report DailyReport? @relation(fields: [reportId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+}
+
+model MaintenanceIssue {
+  id          String    @id @default(uuid())
+  reportId    String?
+  details     String
+  priority    String    @default("MEDIUM") // LOW | MEDIUM | HIGH
+  status      String    @default("OPEN")   // OPEN | CLOSED
+  createdAt   DateTime  @default(now())
+  resolvedAt  DateTime?
+
+  report DailyReport? @relation(fields: [reportId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+}
+
+model Incident {
+  id        String   @id @default(uuid())
+  reportId  String?
+  type      String   // LOST_FOUND | SPECIAL_INCIDENT
+  details   String
+  createdAt DateTime @default(now())
+
+  report DailyReport? @relation(fields: [reportId], references: [id], onDelete: SetNull)
+
+  @@index([type])
+}
+
+model PdfReport {
+  id          String   @id @default(uuid())
+  reportId    String
+  fileName    String
+  filePath    String
+  generatedAt DateTime @default(now())
+
+  report DailyReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+}
+
+// ─────────────────────────── Analytics ───────────────────────────────
+model Review {
+  id        String   @id @default(uuid())
+  source    String   // GOOGLE | OTA | OTHER
+  rating    Float
+  text      String?
+  author    String?
+  category  String?  // optional: SERVICE | CLEANLINESS | ...
+  reviewedAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([source])
+  @@index([reviewedAt])
+}
+
+model RevenueRecord {
+  id             String   @id @default(uuid())
+  recordDate     DateTime @unique
+  revenue        Float    @default(0)
+  roomsSold      Int      @default(0)
+  roomsAvailable Int      @default(0)
+  adr            Float    @default(0) // Average Daily Rate
+  revpar         Float    @default(0) // Revenue Per Available Room
+  source         String   @default("MANUAL") // MANUAL | PMS
+  createdAt      DateTime @default(now())
+
+  @@index([recordDate])
+}
+
+model RevenueTarget {
+  id            String @id @default(uuid())
+  year          Int
+  month         Int // 1-12
+  targetRevenue Float
+  createdAt     DateTime @default(now())
+
+  @@unique([year, month])
+}
+
+model Booking {
+  id          String   @id @default(uuid())
+  bookingDate DateTime
+  source      String   // DIRECT | OTA | WALK_IN | CORPORATE | PMS
+  status      String   @default("CONFIRMED") // CONFIRMED | CANCELLED | CHECKED_IN | CHECKED_OUT
+  roomsBooked Int      @default(1)
+  amount      Float    @default(0)
+  guestName   String?
+  createdAt   DateTime @default(now())
+
+  @@index([bookingDate])
+  @@index([source])
+}
+
+// ─────────────────────── Occupancy Manager ───────────────────────────
+// Configurable dropdown sources (managed by Admin in Settings).
+model RoomType {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+model OnlineSource {
+  id        String   @id @default(uuid())
+  name      String   @unique // e.g. MakeMyTrip, Booking.com, Agoda
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+model Pujari {
+  id            String   @id @default(uuid())
+  name          String   @unique
+  phone         String?
+  commissionPct Float    @default(0) // % commission on rooms they refer
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+}
+
+// One row per (date, slot). Slots: SLOT_1000 | SLOT_1600 | SLOT_2200
+model OccupancySlot {
+  id              String   @id @default(uuid())
+  reportDate      DateTime
+  slot            String   // SLOT_1000 | SLOT_1600 | SLOT_2200
+  totalRooms      Int      // snapshot of the hotel total at submit time
+  workingRooms    Int
+  outOfOrder      Int      // auto = totalRooms - workingRooms
+  roomsSold       Int      // auto = number of RoomSale rows
+  totalRevenue    Float    @default(0) // auto = sum of priceSold
+  submittedById   String?
+  submittedByName String
+  notes           String?
+  submittedAt     DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  sales RoomSale[]
+
+  @@unique([reportDate, slot])
+  @@index([reportDate])
+}
+
+model RoomSale {
+  id           String   @id @default(uuid())
+  slotId       String
+  roomType     String
+  roomNumber   String
+  source       String   // ONLINE | WALK_IN | PUJARI
+  sourceDetail String?  // OTA name (ONLINE) | Pujari name (PUJARI) | null (WALK_IN)
+  priceSold    Float    @default(0)
+  createdAt    DateTime @default(now())
+
+  slot OccupancySlot @relation(fields: [slotId], references: [id], onDelete: Cascade)
+
+  @@index([slotId])
+}
+
+// ─────────────────────────── Notifications ───────────────────────────
+model Notification {
+  id        String   @id @default(uuid())
+  type      String   // MISSED_GENSET | MISSED_WATER | PENDING_REPORT | OPEN_MAINTENANCE | INFO
+  title     String
+  message   String
+  severity  String   @default("INFO") // INFO | WARNING | CRITICAL
+  userId    String?
+  targetRole String? // role-targeted notifications
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([read])
+}
+
+// ─────────────────────────── System Settings ─────────────────────────
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}

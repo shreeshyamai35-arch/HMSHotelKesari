@@ -1,0 +1,15 @@
+{
+  "name": "csv-download-automation",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Playwright script that logs into a service and downloads a CSV to the Desktop.",
+  "scripts": {
+    "start": "node download-csv.mjs",
+    "postinstall": "playwright install chromium"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "playwright": "^1.48.0"
+  }
+}
