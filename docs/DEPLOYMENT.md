@@ -159,3 +159,36 @@ docker compose restart backend        # restart API
 docker compose down                   # stop (keeps volumes/data)
 docker compose down -v                # stop AND delete data (careful!)
 ```
+
+---
+
+## 11. Quick test deploy on Render (Blueprint)
+
+A `render.yaml` Blueprint at the repo root deploys the whole app (Postgres +
+API + static frontend) with almost no manual wiring. Good for a live test URL.
+
+**Steps:**
+1. Push this repo to GitHub (see below).
+2. Render Dashboard → **New → Blueprint** → connect the repo.
+3. Render reads `render.yaml` and provisions:
+   - `kesari-db` — free PostgreSQL
+   - `kesari-api` — the backend (built from `backend/Dockerfile`, auto-switches Prisma to Postgres)
+   - `kesari-web` — the React static site, which rewrites `/api/*` to the API
+4. Click **Apply**. First deploy seeds demo data (`SEED_ON_START=true`).
+5. After it's live, set `SEED_ON_START=false` on `kesari-api` and redeploy.
+
+**Push to GitHub:**
+```bash
+git remote add origin https://github.com/<you>/<repo>.git
+git branch -M main
+git push -u origin main
+```
+
+**Notes / gotchas:**
+- The static site rewrites `/api/*` to `https://kesari-api.onrender.com`. If
+  Render gives the API a different hostname (name already taken), update the
+  `destination` in `render.yaml` → routes to match, then redeploy.
+- Free Postgres and free web services **cold-start** (sleep after inactivity) and
+  free Postgres expires after ~30 days — fine for testing, upgrade for real use.
+- `CORS_ORIGIN` is `*` for testing; tighten it to the web URL for production.
+- Never commit `.env` — the root `.gitignore` already excludes it.

@@ -19,6 +19,7 @@ databases:
     databaseName: kesari
     user: kesari
     plan: free
+    region: oregon
 
 services:
   # ─── Backend API (Docker) ───────────────────────────────
@@ -26,7 +27,7 @@ services:
     name: kesari-api
     runtime: docker
     plan: free
-    region: singapore
+    region: oregon
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
     healthCheckPath: /api/health
