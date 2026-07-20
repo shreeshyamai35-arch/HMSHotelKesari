@@ -18,6 +18,7 @@ import Users from './pages/Users';
 import Profile from './pages/Profile';
 import Occupancy from './pages/Occupancy';
 import Settings from './pages/Settings';
+import Analytics from './pages/Analytics';
 
 export default function App() {
   return (
@@ -45,6 +46,14 @@ export default function App() {
             element={
               <ProtectedRoute roles={['ADMIN', 'FRONT_OFFICE', 'REVENUE', 'MANAGEMENT']}>
                 <Occupancy />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/analytics"
+            element={
+              <ProtectedRoute roles={['ADMIN', 'MANAGEMENT', 'REVENUE']}>
+                <Analytics />
               </ProtectedRoute>
             }
           />

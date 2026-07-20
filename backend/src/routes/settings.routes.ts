@@ -4,7 +4,11 @@ import prisma from '../lib/prisma';
 import { asyncHandler } from '../lib/asyncHandler';
 import { authenticate, authorize } from '../middleware/auth';
 import { ROLES } from '../constants/roles';
-import { SETTING_TOTAL_ROOMS } from '../constants/roles';
+import {
+  SETTING_TOTAL_ROOMS,
+  SETTING_REVENUE_TIER_LOW,
+  SETTING_REVENUE_TIER_HIGH,
+} from '../constants/roles';
 import { notFound, conflict } from '../lib/errors';
 
 const router = Router();
@@ -16,6 +20,13 @@ const adminOnly = authorize(ROLES.ADMIN);
 async function getTotalRooms(): Promise<number> {
   const s = await prisma.setting.findUnique({ where: { key: SETTING_TOTAL_ROOMS } });
   return s ? parseInt(s.value, 10) || 0 : 0;
+}
+
+async function getNumberSetting(key: string): Promise<number | null> {
+  const s = await prisma.setting.findUnique({ where: { key } });
+  if (!s) return null;
+  const n = parseFloat(s.value);
+  return isNaN(n) ? null : n;
 }
 
 // ─── Config (readable by any authenticated user) ──────────
@@ -38,13 +49,42 @@ router.get(
   '/',
   adminOnly,
   asyncHandler(async (_req, res) => {
-    const [totalRooms, roomTypes, onlineSources, pujaris] = await Promise.all([
+    const [totalRooms, roomTypes, onlineSources, pujaris, tierLow, tierHigh] = await Promise.all([
       getTotalRooms(),
       prisma.roomType.findMany({ orderBy: { name: 'asc' } }),
       prisma.onlineSource.findMany({ orderBy: { name: 'asc' } }),
       prisma.pujari.findMany({ orderBy: { name: 'asc' } }),
+      getNumberSetting(SETTING_REVENUE_TIER_LOW),
+      getNumberSetting(SETTING_REVENUE_TIER_HIGH),
     ]);
-    res.json({ totalRooms, roomTypes, onlineSources, pujaris });
+    res.json({ totalRooms, roomTypes, onlineSources, pujaris, revenueTiers: { low: tierLow, high: tierHigh } });
+  })
+);
+
+// ─── Revenue Calendar tier thresholds (admin override) ────
+const tiersSchema = z.object({
+  low: z.number().min(0).nullable(),
+  high: z.number().min(0).nullable(),
+});
+router.put(
+  '/revenue-tiers',
+  adminOnly,
+  asyncHandler(async (req, res) => {
+    const { low, high } = tiersSchema.parse(req.body);
+    async function setOrClear(key: string, val: number | null) {
+      if (val === null) {
+        await prisma.setting.deleteMany({ where: { key } });
+      } else {
+        await prisma.setting.upsert({
+          where: { key },
+          create: { key, value: String(val) },
+          update: { value: String(val) },
+        });
+      }
+    }
+    await setOrClear(SETTING_REVENUE_TIER_LOW, low);
+    await setOrClear(SETTING_REVENUE_TIER_HIGH, high);
+    res.json({ revenueTiers: { low, high } });
   })
 );
 

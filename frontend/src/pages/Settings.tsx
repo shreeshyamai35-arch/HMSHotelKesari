@@ -40,8 +40,61 @@ export default function Settings() {
           />
 
           <PujariManager pujaris={data.pujaris} onChange={() => qc.invalidateQueries({ queryKey: ['settings'] })} />
+
+          <RevenueTiersCard
+            low={data.revenueTiers?.low ?? null}
+            high={data.revenueTiers?.high ?? null}
+            onSaved={() => qc.invalidateQueries({ queryKey: ['settings'] })}
+          />
         </div>
       )}
+    </div>
+  );
+}
+
+function RevenueTiersCard({ low, high, onSaved }: { low: number | null; high: number | null; onSaved: () => void }) {
+  const [lowV, setLowV] = useState(low === null ? '' : String(low));
+  const [highV, setHighV] = useState(high === null ? '' : String(high));
+  useEffect(() => {
+    setLowV(low === null ? '' : String(low));
+    setHighV(high === null ? '' : String(high));
+  }, [low, high]);
+
+  const save = useMutation({
+    mutationFn: async () =>
+      (
+        await api.put('/settings/revenue-tiers', {
+          low: lowV === '' ? null : parseFloat(lowV),
+          high: highV === '' ? null : parseFloat(highV),
+        })
+      ).data,
+    onSuccess: onSaved,
+  });
+
+  const isAuto = lowV === '' && highV === '';
+
+  return (
+    <div className="card">
+      <h2 className="mb-1 text-lg font-semibold text-navy">Revenue Calendar Tiers</h2>
+      <p className="mb-3 text-sm text-on-surface-variant">
+        Daily revenue color-coding on the Analytics calendar. Leave both blank for automatic (relative to each month's
+        average). Set values for fixed thresholds.
+      </p>
+      <div className="flex flex-wrap items-end gap-2">
+        <div>
+          <label className="label">Low below (₹)</label>
+          <input className="input w-40" type="number" min={0} placeholder="auto" value={lowV} onChange={(e) => setLowV(e.target.value)} />
+        </div>
+        <div>
+          <label className="label">High at/above (₹)</label>
+          <input className="input w-40" type="number" min={0} placeholder="auto" value={highV} onChange={(e) => setHighV(e.target.value)} />
+        </div>
+        <button className="btn-primary" disabled={save.isPending} onClick={() => save.mutate()}>
+          {save.isPending ? <Spinner className="h-4 w-4" /> : <Save className="h-4 w-4" />} Save
+        </button>
+        <span className="pb-2 text-xs text-on-surface-variant">{isAuto ? 'Mode: Automatic' : 'Mode: Fixed thresholds'}</span>
+        {save.isSuccess && !save.isPending && <span className="pb-2 text-sm text-success">Saved ✓</span>}
+      </div>
     </div>
   );
 }

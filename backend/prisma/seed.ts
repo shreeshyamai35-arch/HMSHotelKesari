@@ -152,10 +152,17 @@ async function main() {
         },
       });
       const sources = ['OTA', 'DIRECT', 'WALK_IN', 'CORPORATE'];
+      // Lead time (days between booking and arrival) varies by source.
+      const leadBySource: Record<string, number> = { OTA: 12, DIRECT: 5, WALK_IN: 0, CORPORATE: 20 };
       for (let j = 0; j < 4; j++) {
+        const arrivalDate = recordDate; // stay/arrival = the record day
+        const lead = (leadBySource[sources[j]] + (seed % 6)) % 40;
+        const bookedOn = startOfDay(addDays(arrivalDate, -lead));
         await prisma.booking.create({
           data: {
-            bookingDate: recordDate,
+            bookingDate: bookedOn,
+            arrivalDate,
+            nights: 1 + (seed % 3),
             source: sources[j],
             status: j === 3 && seed % 5 === 0 ? 'CANCELLED' : 'CONFIRMED',
             roomsBooked: Math.max(1, Math.round(roomsSold / 4)),

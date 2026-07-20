@@ -51,3 +51,7 @@ export const ROOM_SALE_SOURCES = ['ONLINE', 'WALK_IN', 'PUJARI'] as const;
 
 // Key used in the Setting table for the fixed hotel room count.
 export const SETTING_TOTAL_ROOMS = 'HOTEL_TOTAL_ROOMS';
+
+// Revenue Calendar tier thresholds (admin override; blank = auto per-month).
+export const SETTING_REVENUE_TIER_LOW = 'REVENUE_TIER_LOW';
+export const SETTING_REVENUE_TIER_HIGH = 'REVENUE_TIER_HIGH';

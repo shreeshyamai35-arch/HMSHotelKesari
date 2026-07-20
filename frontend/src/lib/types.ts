@@ -234,7 +234,9 @@ export interface OccupancyConfig {
   pujaris: Pujari[];
 }
 
-export interface SettingsData extends OccupancyConfig {}
+export interface SettingsData extends OccupancyConfig {
+  revenueTiers?: { low: number | null; high: number | null };
+}
 
 export interface RoomSale {
   id: string;
@@ -278,4 +280,75 @@ export interface OccupancyAnalytics {
   byPujari: Record<string, { rooms: number; revenue: number; commission: number }>;
   byRoomType: Record<string, { rooms: number; revenue: number }>;
   trend: { date: string; roomsSold: number; revenue: number; occupancy: number }[];
+}
+
+// ─── Dashboard Analytics ──────────────────────────────────
+export interface TodaySnapshot {
+  date: string;
+  revenue: number;
+  occupancy: number;
+  adr: number;
+  revpar: number;
+  checkIns: number;
+  checkOuts: number;
+  roomsAvailable: number;
+  roomsSold: number;
+}
+
+export interface PickupBucket {
+  bookings: number;
+  rooms: number;
+  revenue: number;
+}
+export interface PickupReport {
+  asOf: string;
+  yesterday: PickupBucket;
+  last7: PickupBucket;
+  last30: PickupBucket;
+  currentMonth: PickupBucket;
+}
+
+export interface BookingWindow {
+  totalBookings: number;
+  buckets: { key: string; label: string; bookings: number; rooms: number; pct: number }[];
+}
+
+export type RevenueTier = 'HIGH' | 'MEDIUM' | 'LOW' | 'NONE';
+export interface CalendarDay {
+  date: string;
+  revenue: number;
+  occupancy: number;
+  adr: number;
+  revpar: number;
+  roomsSold: number;
+  otaContribution: number;
+  tier: RevenueTier;
+}
+export interface RevenueCalendar {
+  year: number;
+  month: number;
+  avgRevenue: number;
+  thresholds: { low: number; high: number; auto: boolean };
+  days: CalendarDay[];
+}
+
+export interface YoyYearStats {
+  year: number;
+  revenue: number;
+  occupancy: number;
+  adr: number;
+  revpar: number;
+  reviewScore: number;
+  monthly: number[];
+}
+export interface YoyComparison {
+  current: YoyYearStats;
+  previous: YoyYearStats;
+  deltas: {
+    revenue: number | null;
+    occupancy: number | null;
+    adr: number | null;
+    revpar: number | null;
+    reviewScore: number | null;
+  };
 }

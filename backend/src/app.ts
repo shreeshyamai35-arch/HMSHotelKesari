@@ -20,6 +20,7 @@ import aiRoutes from './routes/ai.routes';
 import pmsRoutes from './routes/pms.routes';
 import occupancyRoutes from './routes/occupancy.routes';
 import settingsRoutes from './routes/settings.routes';
+import analyticsRoutes from './routes/analytics.routes';
 
 export function createApp() {
   const app = express();
@@ -48,6 +49,7 @@ export function createApp() {
   app.use('/api/pms', pmsRoutes);
   app.use('/api/occupancy', occupancyRoutes);
   app.use('/api/settings', settingsRoutes);
+  app.use('/api/analytics', analyticsRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

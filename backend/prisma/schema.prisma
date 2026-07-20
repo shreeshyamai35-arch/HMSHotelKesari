@@ -189,16 +189,19 @@ model RevenueTarget {
 }
 
 model Booking {
-  id          String   @id @default(uuid())
-  bookingDate DateTime
-  source      String   // DIRECT | OTA | WALK_IN | CORPORATE | PMS
-  status      String   @default("CONFIRMED") // CONFIRMED | CANCELLED | CHECKED_IN | CHECKED_OUT
-  roomsBooked Int      @default(1)
-  amount      Float    @default(0)
+  id          String    @id @default(uuid())
+  bookingDate DateTime  // the date the booking was made ("booked on")
+  arrivalDate DateTime? // check-in date
+  nights      Int       @default(1) // length of stay; departure = arrival + nights
+  source      String    // DIRECT | OTA | WALK_IN | CORPORATE | PMS
+  status      String    @default("CONFIRMED") // CONFIRMED | CANCELLED | CHECKED_IN | CHECKED_OUT
+  roomsBooked Int       @default(1)
+  amount      Float     @default(0)
   guestName   String?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
 
   @@index([bookingDate])
+  @@index([arrivalDate])
   @@index([source])
 }
 

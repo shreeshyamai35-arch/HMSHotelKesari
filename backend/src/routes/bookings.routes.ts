@@ -34,6 +34,8 @@ router.get(
 
 const createSchema = z.object({
   bookingDate: z.string(),
+  arrivalDate: z.string().optional().nullable(),
+  nights: z.number().int().min(1).optional(),
   source: z.enum(['DIRECT', 'OTA', 'WALK_IN', 'CORPORATE', 'PMS']),
   status: z.enum(['CONFIRMED', 'CANCELLED', 'CHECKED_IN', 'CHECKED_OUT']).optional(),
   roomsBooked: z.number().int().min(1).optional(),
@@ -49,6 +51,8 @@ router.post(
     const booking = await prisma.booking.create({
       data: {
         bookingDate: startOfDay(parseDate(data.bookingDate)),
+        arrivalDate: data.arrivalDate ? startOfDay(parseDate(data.arrivalDate)) : null,
+        nights: data.nights ?? 1,
         source: data.source,
         status: data.status ?? 'CONFIRMED',
         roomsBooked: data.roomsBooked ?? 1,

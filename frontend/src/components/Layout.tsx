@@ -17,6 +17,7 @@ import {
   LogOut,
   ChevronDown,
   BedDouble,
+  BarChart3,
   Settings as SettingsIcon,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -38,6 +39,7 @@ const NAV: NavItem[] = [
   { to: '/reports', label: 'Reports', icon: FileText, roles: ['ADMIN', 'FRONT_OFFICE', 'MANAGEMENT', 'REVENUE'] },
   { to: '/issues', label: 'Complaints & Maintenance', icon: AlertTriangle, roles: ['ADMIN', 'FRONT_OFFICE', 'MANAGEMENT'] },
   { to: '/reviews', label: 'Review Tracker', icon: Star, roles: ['ADMIN', 'REVENUE', 'MANAGEMENT'] },
+  { to: '/analytics', label: 'Analytics', icon: BarChart3, roles: ['ADMIN', 'MANAGEMENT', 'REVENUE'] },
   { to: '/revenue', label: 'Revenue Analytics', icon: TrendingUp, roles: ['ADMIN', 'REVENUE', 'MANAGEMENT'] },
   { to: '/bookings', label: 'Booking Analytics', icon: CalendarRange, roles: ['ADMIN', 'REVENUE', 'MANAGEMENT'] },
   { to: '/performance', label: 'Team Performance', icon: Users2, roles: ['ADMIN', 'MANAGEMENT', 'REVENUE'] },
