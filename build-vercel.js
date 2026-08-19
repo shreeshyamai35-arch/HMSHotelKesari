@@ -11,12 +11,13 @@ const root = __dirname;
 const backend = path.join(root, 'backend');
 const frontend = path.join(root, 'frontend');
 
-// Build backend - install typescript as dev dependency
+// Build backend
 run('npm install', backend);
-run('npx tsc -p tsconfig.json', backend);
+run('npx prisma generate', backend);
+run('npx --package=typescript tsc -p tsconfig.json', backend);
 
 // Build frontend
 run('npm install', frontend);
-run('npx tsc -b && npx vite build', frontend);
+run('npx --package=typescript tsc -b && npx vite build', frontend);
 
 console.log('Build complete!');
