@@ -6,8 +6,7 @@
   "installCommand": "npm --prefix backend install",
   "functions": {
     "api/index.ts": {
-      "runtime": "nodejs20.x",
-      "includeFiles": "backend/**"
+      "runtime": "nodejs20.x"
     }
   },
   "rewrites": [
