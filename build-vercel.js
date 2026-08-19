@@ -33,29 +33,21 @@ console.log('DIRECT_URL for build:', process.env.DIRECT_URL.replace(/:[^:@]+@/, 
 
 console.log('Generating Prisma Client...');
 try {
-  execSync('npx prisma generate --skip-generate', {
+  const output = execSync('npx prisma generate', {
     cwd: backend,
     stdio: ['pipe', 'pipe', 'pipe'],
     encoding: 'utf-8',
     env: { ...process.env }
   });
+  console.log(output);
+  console.log('Prisma Client generated successfully');
 } catch (error) {
-  console.log('Prisma generate with --skip-generate failed, trying without flag...');
-  try {
-    execSync('npx prisma generate', {
-      cwd: backend,
-      stdio: 'inherit',
-      encoding: 'utf-8',
-      env: { ...process.env }
-    });
-  } catch (error2) {
-    console.error('Prisma generate failed!');
-    console.error('Error:', error2.message);
-    console.error('Exit code:', error2.status);
-    if (error2.stderr) console.error('stderr:', error2.stderr);
-    if (error2.stdout) console.error('stdout:', error2.stdout);
-    process.exit(1);
-  }
+  console.error('Prisma generate failed!');
+  console.error('Error:', error.message);
+  console.error('Exit code:', error.status);
+  if (error.stderr) console.error('stderr:', error.stderr);
+  if (error.stdout) console.error('stdout:', error.stdout);
+  process.exit(1);
 }
 
 console.log('Compiling TypeScript...');
