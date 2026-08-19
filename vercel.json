@@ -1,6 +1,26 @@
 {
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/index" },
-    { "source": "/(.*)", "destination": "/index.html" }
-  ]
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/(.*)",
+      "destination": {
+        "type": "service",
+        "service": "kesariweb"
+      }
+    }
+  ],
+  "services": {
+    "kesariweb": {
+      "root": "frontend",
+      "framework": "vite",
+      "buildCommand": "npm install && npm run build"
+    }
+  }
 }
