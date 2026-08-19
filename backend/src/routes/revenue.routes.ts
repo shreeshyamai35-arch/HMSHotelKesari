@@ -113,7 +113,7 @@ router.post(
     const data = targetSchema.parse(req.body);
     const target = await prisma.revenueTarget.upsert({
       where: { year_month: { year: data.year, month: data.month } },
-      create: data,
+      create: { year: data.year, month: data.month, targetRevenue: data.targetRevenue },
       update: { targetRevenue: data.targetRevenue },
     });
     res.status(201).json(target);
