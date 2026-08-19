@@ -5,14 +5,11 @@ const path = require('path');
 function run(cmd, cwd) {
   console.log(`Running: ${cmd} in ${cwd}`);
   try {
-    const result = execSync(cmd, { cwd, stdio: 'pipe', encoding: 'utf-8' });
-    console.log(result);
+    const result = execSync(cmd, { cwd, stdio: 'inherit', encoding: 'utf-8' });
     return result;
   } catch (error) {
     console.error(`Command failed: ${cmd}`);
     console.error(`Exit code: ${error.status}`);
-    console.error(`stdout: ${error.stdout}`);
-    console.error(`stderr: ${error.stderr}`);
     console.error(`Error: ${error.message}`);
     process.exit(error.status || 1);
   }
