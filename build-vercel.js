@@ -20,16 +20,33 @@ const backend = path.join(root, 'backend');
 const frontend = path.join(root, 'frontend');
 
 // Build backend
+console.log('Installing backend dependencies...');
 run('npm install', backend);
 
 // Set dummy DATABASE_URL for Prisma generate
-// (Prisma validate connection string format even though it doesn't connect)
+// (Prisma validates connection string format even though it doesn't connect)
 process.env.DATABASE_URL = process.env.DATABASE_URL || 'postgresql://user:pass@localhost:5432/dummy';
 process.env.DIRECT_URL = process.env.DIRECT_URL || 'postgresql://user:pass@localhost:5432/dummy';
 
 console.log('DATABASE_URL for build:', process.env.DATABASE_URL.replace(/:[^:@]+@/, ':***@'));
+console.log('DIRECT_URL for build:', process.env.DIRECT_URL.replace(/:[^:@]+@/, ':***@'));
 
-run('npx prisma generate', backend);
+console.log('Generating Prisma Client...');
+try {
+  execSync('npx prisma generate', {
+    cwd: backend,
+    stdio: 'inherit',
+    encoding: 'utf-8',
+    env: { ...process.env }
+  });
+} catch (error) {
+  console.error('Prisma generate failed!');
+  console.error('Error:', error.message);
+  console.error('Exit code:', error.status);
+  process.exit(1);
+}
+
+console.log('Compiling TypeScript...');
 run('npx tsc -p tsconfig.json', backend);
 
 // Build frontend
