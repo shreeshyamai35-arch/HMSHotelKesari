@@ -38,8 +38,11 @@ export default function Reports() {
       link.download = filename;
       link.click();
       window.URL.revokeObjectURL(link.href);
-    } catch (err) {
-      alert(apiError(err));
+    } catch (err: any) {
+      const errorMsg = err.response?.status === 404
+        ? 'No occupancy data found for the selected date/period. Please ensure occupancy data has been entered.'
+        : apiError(err);
+      alert(errorMsg);
     } finally {
       setDownloading(null);
     }
