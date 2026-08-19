@@ -35,9 +35,9 @@ console.log('Generating Prisma Client...');
 run('npx prisma generate', backend);
 
 console.log('Compiling TypeScript...');
-// Run tsc via node directly to avoid shell binary resolution issues
-const tscScript = path.join(backend, 'node_modules', 'typescript', 'bin', 'tsc');
-run(`node "${tscScript}" -p tsconfig.json`, backend);
+// Run tsc via node directly pointing to lib/tsc.js
+const tscLib = path.join(backend, 'node_modules', 'typescript', 'lib', 'tsc.js');
+run(`node "${tscLib}" -p tsconfig.json`, backend);
 
 // Build frontend
 run('npm install', frontend);
