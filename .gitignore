@@ -29,3 +29,5 @@ backend/storage/pdf/*
 # OS / editor
 .DS_Store
 Thumbs.db
+.vercel
+.env*
