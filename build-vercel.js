@@ -20,7 +20,8 @@ const frontend = path.join(root, 'frontend');
 
 // Build backend
 run('npm install', backend);
-run('npm run build', backend);
+run('npx prisma generate', backend);
+run('npx tsc -p tsconfig.json', backend);
 
 // Build frontend
 run('npm install', frontend);
