@@ -25,13 +25,12 @@ const frontend = path.join(root, 'frontend');
 // Build backend
 run('npm install', backend);
 
-// Prisma requires DATABASE_URL even during generate
-// Set to Vercel env var if available, otherwise use dummy
-if (!process.env.DATABASE_URL) {
-  process.env.DATABASE_URL = 'postgresql://user:pass@localhost:5432/dummy';
-  process.env.DIRECT_URL = 'postgresql://user:pass@localhost:5432/dummy';
-  console.log('Using dummy DATABASE_URL for build (will be replaced at runtime)');
-}
+// Set dummy DATABASE_URL for Prisma generate
+// (Prisma validate connection string format even though it doesn't connect)
+process.env.DATABASE_URL = process.env.DATABASE_URL || 'postgresql://user:pass@localhost:5432/dummy';
+process.env.DIRECT_URL = process.env.DIRECT_URL || 'postgresql://user:pass@localhost:5432/dummy';
+
+console.log('DATABASE_URL for build:', process.env.DATABASE_URL.replace(/:[^:@]+@/, ':***@'));
 
 run('npx prisma generate', backend);
 run('npx tsc -p tsconfig.json', backend);
