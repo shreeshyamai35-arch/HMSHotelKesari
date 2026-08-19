@@ -6,6 +6,8 @@ node_modules/
 dist/
 **/dist/
 build/
+api/api/
+api/backend/
 
 # Environment / secrets  (NEVER commit these)
 .env
