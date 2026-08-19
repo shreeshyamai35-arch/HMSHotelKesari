@@ -24,6 +24,11 @@ const frontend = path.join(root, 'frontend');
 
 // Build backend
 run('npm install', backend);
+
+// Set dummy DATABASE_URL for Prisma generate (required but not used during build)
+process.env.DATABASE_URL = 'postgresql://user:pass@localhost:5432/dummy';
+process.env.DIRECT_URL = 'postgresql://user:pass@localhost:5432/dummy';
+
 run('npx prisma generate', backend);
 run('npx tsc -p tsconfig.json', backend);
 
