@@ -4,7 +4,14 @@ const path = require('path');
 
 function run(cmd, cwd) {
   console.log(`Running: ${cmd} in ${cwd}`);
-  execSync(cmd, { cwd, stdio: 'inherit' });
+  try {
+    execSync(cmd, { cwd, stdio: 'inherit' });
+  } catch (error) {
+    console.error(`Command failed: ${cmd}`);
+    console.error(`Exit code: ${error.status}`);
+    console.error(`Error: ${error.message}`);
+    process.exit(error.status || 1);
+  }
 }
 
 const root = __dirname;
@@ -13,11 +20,10 @@ const frontend = path.join(root, 'frontend');
 
 // Build backend
 run('npm install', backend);
-run('npx prisma generate', backend);
-run('npx --package=typescript@5.7.3 tsc -p tsconfig.json', backend);
+run('npm run build', backend);
 
 // Build frontend
 run('npm install', frontend);
-run('npx --package=typescript@5.7.3 tsc -b && npx vite build', frontend);
+run('npm run build', frontend);
 
 console.log('Build complete!');
