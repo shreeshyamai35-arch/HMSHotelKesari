@@ -1,7 +1,14 @@
 {
   "version": 2,
+  "buildCommand": "node build-vercel.js",
+  "installCommand": "echo skip",
+  "outputDirectory": "frontend/dist",
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index" },
     { "source": "/(.*)", "destination": "/index.html" }
-  ]
+  ],
+  "env": {
+    "DATABASE_URL": "@database_url",
+    "DIRECT_URL": "@direct_url"
+  }
 }
