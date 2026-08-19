@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Trash2, Save } from 'lucide-react';
+import { Plus, Trash2, Save, Power } from 'lucide-react';
 import { api, apiError } from '../lib/api';
-import { SettingsData } from '../lib/types';
+import { Room, RoomType, SettingsData } from '../lib/types';
 import { PageHeader, LoadingState, ErrorState, Spinner } from '../components/ui';
 
 export default function Settings() {
@@ -21,7 +21,17 @@ export default function Settings() {
 
       {data && (
         <div className="space-y-4">
-          <TotalRoomsCard total={data.totalRooms} onSaved={() => qc.invalidateQueries({ queryKey: ['settings'] })} />
+          <RoomsManager
+            rooms={data.rooms ?? []}
+            roomTypes={data.roomTypes}
+            onChange={() => qc.invalidateQueries({ queryKey: ['settings'] })}
+          />
+
+          <TotalRoomsCard
+            total={data.totalRooms}
+            activeRoomCount={(data.rooms ?? []).filter((r) => r.active).length}
+            onSaved={() => qc.invalidateQueries({ queryKey: ['settings'] })}
+          />
 
           <ListManager
             title="Room Types"
@@ -99,7 +109,15 @@ function RevenueTiersCard({ low, high, onSaved }: { low: number | null; high: nu
   );
 }
 
-function TotalRoomsCard({ total, onSaved }: { total: number; onSaved: () => void }) {
+function TotalRoomsCard({
+  total,
+  activeRoomCount,
+  onSaved,
+}: {
+  total: number;
+  activeRoomCount: number;
+  onSaved: () => void;
+}) {
   const [value, setValue] = useState(String(total));
   useEffect(() => setValue(String(total)), [total]);
 
@@ -111,7 +129,11 @@ function TotalRoomsCard({ total, onSaved }: { total: number; onSaved: () => void
   return (
     <div className="card">
       <h2 className="mb-1 text-lg font-semibold text-navy">Total Rooms in Hotel</h2>
-      <p className="mb-3 text-sm text-on-surface-variant">Set once — auto-filled in every occupancy report.</p>
+      <p className="mb-3 text-sm text-on-surface-variant">
+        {activeRoomCount > 0
+          ? `Currently derived from the Rooms list above (${activeRoomCount} active rooms). This manual value is used only when no rooms are defined.`
+          : 'Set once — auto-filled in every occupancy report. Tip: add your rooms in the Rooms list above and this becomes automatic.'}
+      </p>
       <div className="flex items-end gap-2">
         <div>
           <label className="label">Total rooms</label>
@@ -122,6 +144,157 @@ function TotalRoomsCard({ total, onSaved }: { total: number; onSaved: () => void
         </button>
         {save.isSuccess && !save.isPending && <span className="pb-2 text-sm text-success">Saved ✓</span>}
       </div>
+    </div>
+  );
+}
+
+function RoomsManager({
+  rooms,
+  roomTypes,
+  onChange,
+}: {
+  rooms: Room[];
+  roomTypes: RoomType[];
+  onChange: () => void;
+}) {
+  const [numbers, setNumbers] = useState('');
+  const [typeId, setTypeId] = useState('');
+  const [err, setErr] = useState('');
+
+  const add = useMutation({
+    mutationFn: async () =>
+      (await api.post('/settings/rooms', { numbers: numbers.trim(), roomTypeId: typeId || null })).data,
+    onSuccess: () => {
+      setNumbers('');
+      setErr('');
+      onChange();
+    },
+    onError: (e) => setErr(apiError(e)),
+  });
+
+  const patch = useMutation({
+    mutationFn: async (input: { id: string; data: Partial<Pick<Room, 'roomTypeId' | 'active'>> }) =>
+      (await api.patch(`/settings/rooms/${input.id}`, input.data)).data,
+    onSuccess: () => {
+      setErr('');
+      onChange();
+    },
+    onError: (e) => setErr(apiError(e)),
+  });
+
+  const remove = useMutation({
+    mutationFn: async (id: string) => (await api.delete(`/settings/rooms/${id}`)).data,
+    onSuccess: onChange,
+    onError: (e) => setErr(apiError(e)),
+  });
+
+  const activeCount = rooms.filter((r) => r.active).length;
+
+  return (
+    <div className="card">
+      <h2 className="mb-1 text-lg font-semibold text-navy">Rooms</h2>
+      <p className="mb-3 text-sm text-on-surface-variant">
+        Your hotel's physical rooms. The Occupancy Manager picks from this list (no more typing room numbers), and the
+        total room count is derived from it automatically.
+      </p>
+
+      <div className="mb-3 grid gap-2 sm:grid-cols-[1fr_200px_auto]">
+        <div>
+          <label className="label">Room number(s) — comma-separated for many</label>
+          <input
+            className="input"
+            value={numbers}
+            placeholder="e.g. 101, 102, 103"
+            onChange={(e) => setNumbers(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && numbers.trim() && add.mutate()}
+          />
+        </div>
+        <div>
+          <label className="label">Room type</label>
+          <select className="input" value={typeId} onChange={(e) => setTypeId(e.target.value)}>
+            <option value="">No type</option>
+            {roomTypes
+              .filter((t) => t.active)
+              .map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+          </select>
+        </div>
+        <div className="flex items-end">
+          <button className="btn-primary" disabled={!numbers.trim() || add.isPending} onClick={() => add.mutate()}>
+            {add.isPending ? <Spinner className="h-4 w-4" /> : <Plus className="h-4 w-4" />} Add
+          </button>
+        </div>
+      </div>
+      {err && <p className="mb-2 text-sm text-danger">{err}</p>}
+
+      {rooms.length === 0 ? (
+        <p className="text-sm text-on-surface-variant">No rooms added yet.</p>
+      ) : (
+        <>
+          <p className="mb-2 text-xs text-on-surface-variant">
+            {rooms.length} rooms · {activeCount} active
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[480px]">
+              <thead>
+                <tr>
+                  <th className="table-th">Room No.</th>
+                  <th className="table-th">Type</th>
+                  <th className="table-th">Status</th>
+                  <th className="table-th text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rooms.map((r) => (
+                  <tr key={r.id} className={r.active ? 'hover:bg-surface-low' : 'opacity-50 hover:bg-surface-low'}>
+                    <td className="table-td font-medium">{r.number}</td>
+                    <td className="table-td">
+                      <select
+                        className="input py-1"
+                        value={r.roomTypeId ?? ''}
+                        onChange={(e) => patch.mutate({ id: r.id, data: { roomTypeId: e.target.value || null } })}
+                      >
+                        <option value="">No type</option>
+                        {roomTypes.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.name}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="table-td">
+                      <span className={r.active ? 'badge-success' : 'badge-neutral'}>
+                        {r.active ? 'ACTIVE' : 'INACTIVE'}
+                      </span>
+                    </td>
+                    <td className="table-td text-right">
+                      <div className="inline-flex items-center gap-3">
+                        <button
+                          className="text-on-surface-variant hover:text-navy"
+                          title={r.active ? 'Deactivate (renovation / long-term block)' : 'Activate'}
+                          onClick={() => patch.mutate({ id: r.id, data: { active: !r.active } })}
+                        >
+                          <Power className="h-4 w-4" />
+                        </button>
+                        <button
+                          className="text-danger hover:opacity-70"
+                          title="Delete room (past reports keep their data)"
+                          onClick={() => remove.mutate(r.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </div>
   );
 }

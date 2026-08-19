@@ -5,6 +5,8 @@ import { asyncHandler } from '../lib/asyncHandler';
 import { authenticate, authorize } from '../middleware/auth';
 import { ROLES } from '../constants/roles';
 import { parseDate, startOfDay, endOfDay } from '../lib/dates';
+import { badRequest } from '../lib/errors';
+import { env } from '../config/env';
 
 const router = Router();
 router.use(authenticate);
@@ -53,6 +55,18 @@ router.post(
     const recordDate = startOfDay(parseDate(data.recordDate));
     const { adr, revpar } = computeMetrics(data.revenue, data.roomsSold, data.roomsAvailable);
 
+    // Block manual revenue creation/update when a higher-priority source exists
+    const existing = await prisma.revenueRecord.findUnique({ where: { recordDate } });
+    const requestedSource = data.source ?? 'MANUAL';
+
+    // Source priority: PMS > MANUAL
+    // If a PMS record exists, manual entry cannot override it (unless submitted as PMS)
+    if (existing && existing.source === 'PMS' && requestedSource === 'MANUAL') {
+      throw badRequest(
+        'A PMS-sourced revenue record already exists for this date. Manual entry cannot override PMS data.'
+      );
+    }
+
     const record = await prisma.revenueRecord.upsert({
       where: { recordDate },
       create: {
@@ -62,7 +76,7 @@ router.post(
         roomsAvailable: data.roomsAvailable,
         adr,
         revpar,
-        source: data.source ?? 'MANUAL',
+        source: requestedSource,
       },
       update: {
         revenue: data.revenue,
@@ -70,7 +84,7 @@ router.post(
         roomsAvailable: data.roomsAvailable,
         adr,
         revpar,
-        source: data.source ?? 'MANUAL',
+        source: requestedSource,
       },
     });
     res.status(201).json(record);

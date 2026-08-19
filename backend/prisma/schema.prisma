@@ -9,8 +9,8 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "sqlite"
+  url       = env("DATABASE_URL")
 }
 
 // ─────────────────────────────── Users ───────────────────────────────
@@ -25,8 +25,8 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  reports       DailyReport[]
-  notifications Notification[]
+  reports              DailyReport[]
+  userNotifications    UserNotification[]
 }
 
 // ────────────────────────── Daily Operations ─────────────────────────
@@ -212,6 +212,21 @@ model RoomType {
   name      String   @unique
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
+
+  rooms Room[]
+}
+
+// Physical rooms of the hotel (managed by Admin in Settings). When rooms
+// exist, the hotel's total room count derives from the active rooms.
+model Room {
+  id         String   @id @default(uuid())
+  number     String   @unique
+  roomTypeId String?
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  roomType RoomType?  @relation(fields: [roomTypeId], references: [id], onDelete: SetNull)
+  sales    RoomSale[]
 }
 
 model OnlineSource {
@@ -228,6 +243,28 @@ model Pujari {
   commissionPct Float    @default(0) // % commission on rooms they refer
   active        Boolean  @default(true)
   createdAt     DateTime @default(now())
+
+  sales       RoomSale[]
+  settlements PujariSettlement[]
+}
+
+// Monthly commission settlement marker. A row means the month was marked
+// paid; totals are frozen at pay time so later edits can't rewrite payouts.
+model PujariSettlement {
+  id         String   @id @default(uuid())
+  pujariId   String
+  year       Int
+  month      Int // 1-12
+  rooms      Int      @default(0)
+  revenue    Float    @default(0)
+  commission Float    @default(0) // frozen amount actually paid
+  paidByName String
+  notes      String?
+  paidAt     DateTime @default(now())
+
+  pujari Pujari @relation(fields: [pujariId], references: [id], onDelete: Cascade)
+
+  @@unique([pujariId, year, month])
 }
 
 // One row per (date, slot). Slots: SLOT_1000 | SLOT_1600 | SLOT_2200
@@ -256,34 +293,57 @@ model OccupancySlot {
 model RoomSale {
   id           String   @id @default(uuid())
   slotId       String
-  roomType     String
-  roomNumber   String
+  roomId       String?  // FK to Room when picked from the room list
+  roomType     String   // snapshot at submit time
+  roomNumber   String   // snapshot at submit time
   source       String   // ONLINE | WALK_IN | PUJARI
   sourceDetail String?  // OTA name (ONLINE) | Pujari name (PUJARI) | null (WALK_IN)
   priceSold    Float    @default(0)
+  // Commission stamped at submit time (PUJARI sales) so later % edits or
+  // renames can never rewrite historical payouts.
+  pujariId         String?
+  commissionPct    Float?
+  commissionAmount Float?
   createdAt    DateTime @default(now())
 
-  slot OccupancySlot @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  slot   OccupancySlot @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  room   Room?         @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  pujari Pujari?       @relation(fields: [pujariId], references: [id], onDelete: SetNull)
 
   @@index([slotId])
+  @@index([roomId])
+  @@index([pujariId])
 }
 
 // ─────────────────────────── Notifications ───────────────────────────
+// Notifications are fanned out to individual users. When a notification targets
+// a role, one UserNotification row is created per user with that role.
 model Notification {
-  id        String   @id @default(uuid())
-  type      String   // MISSED_GENSET | MISSED_WATER | PENDING_REPORT | OPEN_MAINTENANCE | INFO
-  title     String
-  message   String
-  severity  String   @default("INFO") // INFO | WARNING | CRITICAL
-  userId    String?
-  targetRole String? // role-targeted notifications
-  read      Boolean  @default(false)
-  createdAt DateTime @default(now())
+  id         String   @id @default(uuid())
+  type       String   // MISSED_GENSET | MISSED_WATER | PENDING_REPORT | OPEN_MAINTENANCE | INFO
+  title      String
+  message    String
+  severity   String   @default("INFO") // INFO | WARNING | CRITICAL
+  targetRole String?  // which role this was sent to (informational)
+  createdAt  DateTime @default(now())
 
-  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipients UserNotification[]
 
-  @@index([userId])
-  @@index([read])
+  @@index([createdAt])
+}
+
+model UserNotification {
+  id             String   @id @default(uuid())
+  notificationId String
+  userId         String
+  read           Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationId, userId])
+  @@index([userId, read])
 }
 
 // ─────────────────────────── System Settings ─────────────────────────

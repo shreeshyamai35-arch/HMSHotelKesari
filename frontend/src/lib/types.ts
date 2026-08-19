@@ -227,8 +227,17 @@ export interface Pujari {
   createdAt?: string;
 }
 
+export interface Room {
+  id: string;
+  number: string;
+  roomTypeId: string | null;
+  roomTypeName: string | null;
+  active: boolean;
+}
+
 export interface OccupancyConfig {
   totalRooms: number;
+  rooms: Room[];
   roomTypes: RoomType[];
   onlineSources: OnlineSource[];
   pujaris: Pujari[];
@@ -241,11 +250,15 @@ export interface SettingsData extends OccupancyConfig {
 export interface RoomSale {
   id: string;
   slotId: string;
+  roomId?: string | null;
   roomType: string;
   roomNumber: string;
   source: RoomSaleSource;
   sourceDetail?: string | null;
   priceSold: number;
+  pujariId?: string | null;
+  commissionPct?: number | null;
+  commissionAmount?: number | null;
 }
 
 export interface OccupancySlotData {
@@ -279,7 +292,52 @@ export interface OccupancyAnalytics {
   byOta: Record<string, { rooms: number; revenue: number }>;
   byPujari: Record<string, { rooms: number; revenue: number; commission: number }>;
   byRoomType: Record<string, { rooms: number; revenue: number }>;
+  byRoom: Record<string, { rooms: number; revenue: number }>;
   trend: { date: string; roomsSold: number; revenue: number; occupancy: number }[];
+}
+
+export interface OccupancyHistoryDay {
+  date: string;
+  submittedSlots: OccupancySlotKey[];
+  roomsSold: number;
+  workingRooms: number;
+  revenue: number;
+  occupancy: number;
+}
+
+export interface OccupancyHistory {
+  month: string;
+  days: OccupancyHistoryDay[];
+  totals: { revenue: number; roomsSold: number; avgOccupancy: number; daysReported: number };
+}
+
+// ─── Pujari Commissions ───────────────────────────────────
+export interface CommissionSettlement {
+  id: string;
+  rooms: number;
+  revenue: number;
+  commission: number;
+  paidAt: string;
+  paidByName: string;
+}
+
+export interface CommissionRow {
+  pujariId: string | null;
+  name: string;
+  phone: string | null;
+  commissionPct: number | null;
+  active: boolean;
+  rooms: number;
+  revenue: number;
+  commission: number;
+  settlement: CommissionSettlement | null;
+}
+
+export interface CommissionMonth {
+  year: number;
+  month: number;
+  rows: CommissionRow[];
+  totals: { rooms: number; revenue: number; commission: number };
 }
 
 // ─── Dashboard Analytics ──────────────────────────────────

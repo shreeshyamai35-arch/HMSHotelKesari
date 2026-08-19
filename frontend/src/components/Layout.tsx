@@ -18,6 +18,7 @@ import {
   ChevronDown,
   BedDouble,
   BarChart3,
+  IndianRupee,
   Settings as SettingsIcon,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -36,6 +37,7 @@ const NAV: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['ADMIN', 'FRONT_OFFICE', 'REVENUE', 'MANAGEMENT'] },
   { to: '/report/new', label: 'Submit Report', icon: ClipboardList, roles: ['ADMIN', 'FRONT_OFFICE'] },
   { to: '/occupancy', label: 'Occupancy Manager', icon: BedDouble, roles: ['ADMIN', 'FRONT_OFFICE', 'REVENUE', 'MANAGEMENT'] },
+  { to: '/commissions', label: 'Pujari Commissions', icon: IndianRupee, roles: ['ADMIN', 'REVENUE'] },
   { to: '/reports', label: 'Reports', icon: FileText, roles: ['ADMIN', 'FRONT_OFFICE', 'MANAGEMENT', 'REVENUE'] },
   { to: '/issues', label: 'Complaints & Maintenance', icon: AlertTriangle, roles: ['ADMIN', 'FRONT_OFFICE', 'MANAGEMENT'] },
   { to: '/reviews', label: 'Review Tracker', icon: Star, roles: ['ADMIN', 'REVENUE', 'MANAGEMENT'] },

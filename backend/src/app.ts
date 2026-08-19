@@ -21,6 +21,8 @@ import pmsRoutes from './routes/pms.routes';
 import occupancyRoutes from './routes/occupancy.routes';
 import settingsRoutes from './routes/settings.routes';
 import analyticsRoutes from './routes/analytics.routes';
+import commissionsRoutes from './routes/commissions.routes';
+import occupancyReportsRoutes from './routes/occupancy-reports.routes';
 
 export function createApp() {
   const app = express();
@@ -50,6 +52,8 @@ export function createApp() {
   app.use('/api/occupancy', occupancyRoutes);
   app.use('/api/settings', settingsRoutes);
   app.use('/api/analytics', analyticsRoutes);
+  app.use('/api/commissions', commissionsRoutes);
+  app.use('/api/occupancy-reports', occupancyReportsRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

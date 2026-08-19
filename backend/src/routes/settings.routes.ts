@@ -9,18 +9,13 @@ import {
   SETTING_REVENUE_TIER_LOW,
   SETTING_REVENUE_TIER_HIGH,
 } from '../constants/roles';
-import { notFound, conflict } from '../lib/errors';
+import { notFound, conflict, badRequest } from '../lib/errors';
+import { getTotalRooms, listRooms } from '../lib/rooms';
 
 const router = Router();
 router.use(authenticate);
 
 const adminOnly = authorize(ROLES.ADMIN);
-
-// ─── Helpers ──────────────────────────────────────────────
-async function getTotalRooms(): Promise<number> {
-  const s = await prisma.setting.findUnique({ where: { key: SETTING_TOTAL_ROOMS } });
-  return s ? parseInt(s.value, 10) || 0 : 0;
-}
 
 async function getNumberSetting(key: string): Promise<number | null> {
   const s = await prisma.setting.findUnique({ where: { key } });
@@ -34,13 +29,14 @@ async function getNumberSetting(key: string): Promise<number | null> {
 router.get(
   '/config',
   asyncHandler(async (_req, res) => {
-    const [totalRooms, roomTypes, onlineSources, pujaris] = await Promise.all([
+    const [totalRooms, rooms, roomTypes, onlineSources, pujaris] = await Promise.all([
       getTotalRooms(),
+      listRooms(true),
       prisma.roomType.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
       prisma.onlineSource.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
       prisma.pujari.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
     ]);
-    res.json({ totalRooms, roomTypes, onlineSources, pujaris });
+    res.json({ totalRooms, rooms, roomTypes, onlineSources, pujaris });
   })
 );
 
@@ -49,15 +45,16 @@ router.get(
   '/',
   adminOnly,
   asyncHandler(async (_req, res) => {
-    const [totalRooms, roomTypes, onlineSources, pujaris, tierLow, tierHigh] = await Promise.all([
+    const [totalRooms, rooms, roomTypes, onlineSources, pujaris, tierLow, tierHigh] = await Promise.all([
       getTotalRooms(),
+      listRooms(false),
       prisma.roomType.findMany({ orderBy: { name: 'asc' } }),
       prisma.onlineSource.findMany({ orderBy: { name: 'asc' } }),
       prisma.pujari.findMany({ orderBy: { name: 'asc' } }),
       getNumberSetting(SETTING_REVENUE_TIER_LOW),
       getNumberSetting(SETTING_REVENUE_TIER_HIGH),
     ]);
-    res.json({ totalRooms, roomTypes, onlineSources, pujaris, revenueTiers: { low: tierLow, high: tierHigh } });
+    res.json({ totalRooms, rooms, roomTypes, onlineSources, pujaris, revenueTiers: { low: tierLow, high: tierHigh } });
   })
 );
 
@@ -102,6 +99,90 @@ router.put(
       update: { value: String(totalRooms) },
     });
     res.json({ totalRooms: parseInt(s.value, 10) });
+  })
+);
+
+// ─── Rooms (physical room list) ───────────────────────────
+const roomCreateSchema = z.object({
+  // One or many room numbers, comma-separated: "101" or "101, 102, 103".
+  numbers: z.string().min(1).max(2000),
+  roomTypeId: z.string().optional().nullable(),
+});
+
+router.post(
+  '/rooms',
+  adminOnly,
+  asyncHandler(async (req, res) => {
+    const data = roomCreateSchema.parse(req.body);
+
+    const numbers = [...new Set(data.numbers.split(',').map((n) => n.trim()).filter(Boolean))];
+    if (numbers.length === 0) throw badRequest('Enter at least one room number.');
+    if (numbers.some((n) => n.length > 20)) throw badRequest('Room numbers must be 20 characters or fewer.');
+
+    if (data.roomTypeId) {
+      const type = await prisma.roomType.findUnique({ where: { id: data.roomTypeId } });
+      if (!type) throw notFound('Room type not found');
+    }
+
+    const existing = await prisma.room.findMany({ where: { number: { in: numbers } } });
+    if (existing.length > 0) {
+      throw conflict(`Room(s) already exist: ${existing.map((r) => r.number).join(', ')}`);
+    }
+
+    const created = await prisma.$transaction(
+      numbers.map((number) =>
+        prisma.room.create({ data: { number, roomTypeId: data.roomTypeId ?? null } })
+      )
+    );
+    res.status(201).json(created);
+  })
+);
+
+const roomPatchSchema = z.object({
+  number: z.string().min(1).max(20).optional(),
+  roomTypeId: z.string().optional().nullable(),
+  active: z.boolean().optional(),
+});
+
+router.patch(
+  '/rooms/:id',
+  adminOnly,
+  asyncHandler(async (req, res) => {
+    const data = roomPatchSchema.parse(req.body);
+    const existing = await prisma.room.findUnique({ where: { id: req.params.id } });
+    if (!existing) throw notFound('Room not found');
+
+    const newNumber = data.number?.trim() || undefined; // ignore whitespace-only renames
+    if (newNumber && newNumber !== existing.number) {
+      const clash = await prisma.room.findUnique({ where: { number: newNumber } });
+      if (clash) throw conflict('A room with this number already exists');
+    }
+    if (data.roomTypeId) {
+      const type = await prisma.roomType.findUnique({ where: { id: data.roomTypeId } });
+      if (!type) throw notFound('Room type not found');
+    }
+
+    const room = await prisma.room.update({
+      where: { id: req.params.id },
+      data: {
+        number: newNumber,
+        roomTypeId: data.roomTypeId === undefined ? undefined : data.roomTypeId ?? null,
+        active: data.active,
+      },
+    });
+    res.json(room);
+  })
+);
+
+router.delete(
+  '/rooms/:id',
+  adminOnly,
+  asyncHandler(async (req, res) => {
+    const existing = await prisma.room.findUnique({ where: { id: req.params.id } });
+    if (!existing) throw notFound('Room not found');
+    // Past RoomSales keep their number/type snapshots (roomId becomes null).
+    await prisma.room.delete({ where: { id: req.params.id } });
+    res.json({ success: true });
   })
 );
 

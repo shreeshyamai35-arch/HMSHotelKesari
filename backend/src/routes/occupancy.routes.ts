@@ -3,19 +3,23 @@ import { z } from 'zod';
 import prisma from '../lib/prisma';
 import { asyncHandler } from '../lib/asyncHandler';
 import { authenticate, authorize } from '../middleware/auth';
-import { ROLES, OCCUPANCY_SLOTS, ROOM_SALE_SOURCES, SETTING_TOTAL_ROOMS } from '../constants/roles';
-import { parseDate, startOfDay, endOfDay } from '../lib/dates';
-import { badRequest, notFound } from '../lib/errors';
+import { ROLES, OCCUPANCY_SLOTS, ROOM_SALE_SOURCES } from '../constants/roles';
+import { parseDate, startOfDay, endOfDay, localDateKey, nowIST, istDateKey, isSlotWindowOpen, isSlotLocked, SlotTime } from '../lib/dates';
+import { badRequest, notFound, forbidden } from '../lib/errors';
+import { getTotalRooms, listRooms } from '../lib/rooms';
 
 const router = Router();
 router.use(authenticate);
 
-const canSubmit = authorize(ROLES.ADMIN, ROLES.FRONT_OFFICE);
+// Only FRONT_OFFICE and MANAGEMENT roles can submit occupancy reports
+const canSubmit = authorize(ROLES.ADMIN, ROLES.FRONT_OFFICE, ROLES.MANAGEMENT);
 
-async function getTotalRooms(): Promise<number> {
-  const s = await prisma.setting.findUnique({ where: { key: SETTING_TOTAL_ROOMS } });
-  return s ? parseInt(s.value, 10) || 0 : 0;
-}
+// Map internal slot enum to SlotTime type for time window validation
+const SLOT_TO_TIME: Record<string, SlotTime> = {
+  'SLOT_1000': '10am',
+  'SLOT_1600': '4pm',
+  'SLOT_2200': '10pm',
+};
 
 function computeOccupancy(roomsSold: number, workingRooms: number) {
   return workingRooms > 0 ? +((roomsSold / workingRooms) * 100).toFixed(2) : 0;
@@ -25,13 +29,14 @@ function computeOccupancy(roomsSold: number, workingRooms: number) {
 router.get(
   '/config',
   asyncHandler(async (_req, res) => {
-    const [totalRooms, roomTypes, onlineSources, pujaris] = await Promise.all([
+    const [totalRooms, rooms, roomTypes, onlineSources, pujaris] = await Promise.all([
       getTotalRooms(),
+      listRooms(true),
       prisma.roomType.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
       prisma.onlineSource.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
       prisma.pujari.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
     ]);
-    res.json({ totalRooms, roomTypes, onlineSources, pujaris });
+    res.json({ totalRooms, rooms, roomTypes, onlineSources, pujaris });
   })
 );
 
@@ -76,8 +81,9 @@ router.get(
 
 // ─── Create / update a slot (upsert by date + slot) ───────
 const saleSchema = z.object({
-  roomType: z.string().min(1),
-  roomNumber: z.string().min(1),
+  roomId: z.string().optional().nullable(), // set when picked from the room list
+  roomType: z.string().optional().nullable(),
+  roomNumber: z.string().optional().nullable(),
   source: z.enum(ROOM_SALE_SOURCES),
   sourceDetail: z.string().optional().nullable(),
   priceSold: z.number().min(0),
@@ -99,6 +105,30 @@ router.post(
     const reportDate = startOfDay(parseDate(data.date));
     const totalRooms = await getTotalRooms();
 
+    // ── Time window validation ────────────────────────────────
+    const todayIST = istDateKey(nowIST());
+    const requestedDate = data.date; // YYYY-MM-DD string
+
+    // Block backdate and forward date submissions
+    if (requestedDate !== todayIST) {
+      throw forbidden(
+        `Cannot submit reports for ${requestedDate}. Only today's date (${todayIST}) is allowed.`
+      );
+    }
+
+    // Check if the slot's time window is currently open
+    const slotTime = SLOT_TO_TIME[data.slot];
+    if (!slotTime) {
+      throw badRequest(`Invalid slot: ${data.slot}`);
+    }
+
+    if (!isSlotWindowOpen(slotTime)) {
+      throw forbidden(
+        `The ${slotTime} slot window is not open right now. Submit during the designated time window only.`
+      );
+    }
+
+    // ── Existing validation ───────────────────────────────────
     if (totalRooms <= 0) {
       throw badRequest('Total rooms is not configured. Ask an Admin to set it in Settings.');
     }
@@ -111,15 +141,33 @@ router.post(
       );
     }
 
+    // Resolve room list picks: snapshot number + type from the Room record so
+    // sales stay correct even if the room is later renamed or deleted.
+    const roomIds = data.sales.map((s) => s.roomId).filter((id): id is string => !!id);
+    const rooms = roomIds.length
+      ? await prisma.room.findMany({ where: { id: { in: roomIds } }, include: { roomType: true } })
+      : [];
+    const roomById = new Map(rooms.map((r) => [r.id, r]));
+
+    const resolvedSales = data.sales.map((s) => {
+      const room = s.roomId ? roomById.get(s.roomId) : undefined;
+      if (s.roomId && !room) throw badRequest('A selected room no longer exists. Refresh and try again.');
+      const roomNumber = (room?.number ?? s.roomNumber ?? '').trim();
+      const roomType = (room?.roomType?.name ?? s.roomType ?? '').trim();
+      if (!roomNumber) throw badRequest('A room row is missing its room number.');
+      if (!roomType) throw badRequest(`Room ${roomNumber}: missing room type.`);
+      return { ...s, roomId: room?.id ?? null, roomNumber, roomType };
+    });
+
     // No duplicate room numbers within a slot.
-    const roomNumbers = data.sales.map((s) => s.roomNumber.trim().toLowerCase());
+    const roomNumbers = resolvedSales.map((s) => s.roomNumber.toLowerCase());
     const dupes = roomNumbers.filter((n, i) => roomNumbers.indexOf(n) !== i);
     if (dupes.length > 0) {
       throw badRequest(`Duplicate room number(s) in this slot: ${[...new Set(dupes)].join(', ')}`);
     }
 
     // Per-source detail validation.
-    for (const s of data.sales) {
+    for (const s of resolvedSales) {
       if (s.source === 'ONLINE' && !s.sourceDetail) {
         throw badRequest(`Room ${s.roomNumber}: select the online source (OTA).`);
       }
@@ -128,8 +176,23 @@ router.post(
       }
     }
 
-    const roomsSold = data.sales.length;
-    const totalRevenue = data.sales.reduce((sum, s) => sum + s.priceSold, 0);
+    // Stamp Pujari commissions at submit time so later edits to a Pujari's
+    // % or name can never rewrite historical payouts.
+    const pujariNames = [...new Set(
+      resolvedSales.filter((s) => s.source === 'PUJARI').map((s) => s.sourceDetail as string)
+    )];
+    const pujaris = pujariNames.length
+      ? await prisma.pujari.findMany({ where: { name: { in: pujariNames } } })
+      : [];
+    const pujariByName = new Map(pujaris.map((p) => [p.name, p]));
+    for (const name of pujariNames) {
+      if (!pujariByName.has(name)) {
+        throw badRequest(`Pujari "${name}" not found. Refresh and try again.`);
+      }
+    }
+
+    const roomsSold = resolvedSales.length;
+    const totalRevenue = resolvedSales.reduce((sum, s) => sum + s.priceSold, 0);
     const outOfOrder = totalRooms - data.workingRooms;
 
     const result = await prisma.$transaction(async (tx) => {
@@ -159,16 +222,24 @@ router.post(
         });
       }
 
-      if (data.sales.length > 0) {
+      if (resolvedSales.length > 0) {
         await tx.roomSale.createMany({
-          data: data.sales.map((s) => ({
-            slotId: slot.id,
-            roomType: s.roomType,
-            roomNumber: s.roomNumber,
-            source: s.source,
-            sourceDetail: s.source === 'WALK_IN' ? null : s.sourceDetail ?? null,
-            priceSold: s.priceSold,
-          })),
+          data: resolvedSales.map((s) => {
+            const pujari = s.source === 'PUJARI' ? pujariByName.get(s.sourceDetail as string) : undefined;
+            const pct = pujari ? pujari.commissionPct : null;
+            return {
+              slotId: slot.id,
+              roomId: s.roomId,
+              roomType: s.roomType,
+              roomNumber: s.roomNumber,
+              source: s.source,
+              sourceDetail: s.source === 'WALK_IN' ? null : s.sourceDetail ?? null,
+              priceSold: s.priceSold,
+              pujariId: pujari?.id ?? null,
+              commissionPct: pct,
+              commissionAmount: pct !== null ? +((s.priceSold * pct) / 100).toFixed(2) : null,
+            };
+          }),
         });
       }
 
@@ -216,8 +287,93 @@ router.delete(
   asyncHandler(async (req, res) => {
     const existing = await prisma.occupancySlot.findUnique({ where: { id: req.params.id } });
     if (!existing) throw notFound('Occupancy slot not found');
+
+    // Strict locking: once the time window passes, the slot is locked
+    // Only admins can delete locked slots (by re-submitting after deletion)
+    const slotTime = SLOT_TO_TIME[existing.slot];
+    const dateKey = localDateKey(existing.reportDate);
+
+    if (slotTime && isSlotLocked(slotTime, dateKey)) {
+      if (req.user?.role !== ROLES.ADMIN) {
+        throw forbidden(
+          `This slot is locked (time window has passed). Only admins can delete locked slots.`
+        );
+      }
+    }
+
     await prisma.occupancySlot.delete({ where: { id: req.params.id } });
+
+    // The 10 PM slot feeds RevenueRecord — roll it back when deleted
+    // (only if the record is MANUAL-sourced; never touch PMS data).
+    if (existing.slot === 'SLOT_2200') {
+      await prisma.revenueRecord.deleteMany({
+        where: { recordDate: existing.reportDate, source: 'MANUAL' },
+      });
+    }
     res.json({ success: true });
+  })
+);
+
+// ─── Month history (day-by-day summary) ───────────────────
+router.get(
+  '/history',
+  asyncHandler(async (req, res) => {
+    // month=YYYY-MM (defaults to the current month)
+    const monthStr = (req.query.month as string) || undefined;
+    const base = monthStr ? parseDate(`${monthStr}-01`) : new Date();
+    const monthStart = startOfDay(new Date(base.getFullYear(), base.getMonth(), 1));
+    const monthEnd = endOfDay(new Date(base.getFullYear(), base.getMonth() + 1, 0));
+
+    const slots = await prisma.occupancySlot.findMany({
+      where: { reportDate: { gte: monthStart, lte: monthEnd } },
+      orderBy: { reportDate: 'asc' },
+    });
+
+    const byDay = new Map<string, { slots: Set<string>; truth: (typeof slots)[number] }>();
+    const rank = (x: string) => (x === 'SLOT_2200' ? 3 : x === 'SLOT_1600' ? 2 : 1);
+    for (const s of slots) {
+      // Local-parts key: reportDate is local midnight, so this round-trips
+      // correctly back into GET /occupancy?date=... on any server timezone.
+      const key = localDateKey(s.reportDate);
+      const entry = byDay.get(key);
+      if (!entry) {
+        byDay.set(key, { slots: new Set([s.slot]), truth: s });
+      } else {
+        entry.slots.add(s.slot);
+        if (rank(s.slot) >= rank(entry.truth.slot)) entry.truth = s;
+      }
+    }
+
+    const days = [...byDay.entries()].map(([date, e]) => ({
+      date,
+      submittedSlots: OCCUPANCY_SLOTS.filter((k) => e.slots.has(k)),
+      roomsSold: e.truth.roomsSold,
+      workingRooms: e.truth.workingRooms,
+      revenue: e.truth.totalRevenue,
+      occupancy: computeOccupancy(e.truth.roomsSold, e.truth.workingRooms),
+    }));
+
+    const totals = days.reduce(
+      (acc, d) => {
+        acc.revenue += d.revenue;
+        acc.roomsSold += d.roomsSold;
+        acc.workingRooms += d.workingRooms;
+        return acc;
+      },
+      { revenue: 0, roomsSold: 0, workingRooms: 0 }
+    );
+
+    res.json({
+      month: `${monthStart.getFullYear()}-${String(monthStart.getMonth() + 1).padStart(2, '0')}`,
+      days,
+      totals: {
+        revenue: +totals.revenue.toFixed(2),
+        roomsSold: totals.roomsSold,
+        avgOccupancy:
+          totals.workingRooms > 0 ? +((totals.roomsSold / totals.workingRooms) * 100).toFixed(2) : 0,
+        daysReported: days.length,
+      },
+    });
   })
 );
 
@@ -262,6 +418,7 @@ router.get(
     const byOta: Record<string, { rooms: number; revenue: number }> = {};
     const byPujari: Record<string, { rooms: number; revenue: number; commission: number }> = {};
     const byRoomType: Record<string, { rooms: number; revenue: number }> = {};
+    const byRoom: Record<string, { rooms: number; revenue: number }> = {};
 
     let totalRooms = 0;
     let totalRevenue = 0;
@@ -280,17 +437,24 @@ router.get(
         byRoomType[sale.roomType].rooms += 1;
         byRoomType[sale.roomType].revenue += sale.priceSold;
 
+        byRoom[sale.roomNumber] = byRoom[sale.roomNumber] ?? { rooms: 0, revenue: 0 };
+        byRoom[sale.roomNumber].rooms += 1;
+        byRoom[sale.roomNumber].revenue += sale.priceSold;
+
         if (sale.source === 'ONLINE' && sale.sourceDetail) {
           byOta[sale.sourceDetail] = byOta[sale.sourceDetail] ?? { rooms: 0, revenue: 0 };
           byOta[sale.sourceDetail].rooms += 1;
           byOta[sale.sourceDetail].revenue += sale.priceSold;
         }
         if (sale.source === 'PUJARI' && sale.sourceDetail) {
-          const pct = commissionByName.get(sale.sourceDetail) ?? 0;
+          // Prefer the commission stamped at submit time; legacy rows
+          // (before stamping existed) fall back to the current %.
+          const commission =
+            sale.commissionAmount ?? (sale.priceSold * (commissionByName.get(sale.sourceDetail) ?? 0)) / 100;
           byPujari[sale.sourceDetail] = byPujari[sale.sourceDetail] ?? { rooms: 0, revenue: 0, commission: 0 };
           byPujari[sale.sourceDetail].rooms += 1;
           byPujari[sale.sourceDetail].revenue += sale.priceSold;
-          byPujari[sale.sourceDetail].commission += (sale.priceSold * pct) / 100;
+          byPujari[sale.sourceDetail].commission += commission;
         }
       }
       return {
@@ -318,6 +482,7 @@ router.get(
       byOta: round(byOta),
       byPujari: round(byPujari),
       byRoomType: round(byRoomType),
+      byRoom: round(byRoom),
       trend,
     });
   })

@@ -17,6 +17,8 @@ import Notifications from './pages/Notifications';
 import Users from './pages/Users';
 import Profile from './pages/Profile';
 import Occupancy from './pages/Occupancy';
+import OccupancyNew from './pages/OccupancyNew';
+import Commissions from './pages/Commissions';
 import Settings from './pages/Settings';
 import Analytics from './pages/Analytics';
 
@@ -45,7 +47,15 @@ export default function App() {
             path="/occupancy"
             element={
               <ProtectedRoute roles={['ADMIN', 'FRONT_OFFICE', 'REVENUE', 'MANAGEMENT']}>
-                <Occupancy />
+                <OccupancyNew />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/commissions"
+            element={
+              <ProtectedRoute roles={['ADMIN', 'REVENUE']}>
+                <Commissions />
               </ProtectedRoute>
             }
           />

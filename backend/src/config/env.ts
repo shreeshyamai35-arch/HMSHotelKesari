@@ -10,6 +10,9 @@ function required(key: string, fallback?: string): string {
   return value;
 }
 
+// Set timezone to IST before any date operations
+process.env.TZ = process.env.TZ ?? 'Asia/Kolkata';
+
 export const env = {
   nodeEnv: process.env.NODE_ENV ?? 'development',
   port: parseInt(process.env.PORT ?? '4000', 10),
@@ -45,4 +48,5 @@ export const env = {
   enableCron: (process.env.ENABLE_CRON ?? 'true') === 'true',
 
   isProd: (process.env.NODE_ENV ?? 'development') === 'production',
+  timezone: process.env.TZ!,
 };

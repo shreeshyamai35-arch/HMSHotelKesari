@@ -83,6 +83,12 @@ function computeMetrics(revenue: number, roomsSold: number, roomsAvailable: numb
 /** Syncs PMS data into PostgreSQL (RevenueRecord + Booking). Returns counts. */
 export async function syncPms(from: Date, to: Date): Promise<{ provider: string; days: number; bookings: number }> {
   const adapter = getAdapter();
+
+  // Block mock adapter in production to prevent accidental corruption of real data
+  if (env.isProd && adapter.name === 'mock') {
+    throw new Error('Mock PMS sync is disabled in production. Set PMS_PROVIDER to a real adapter or switch NODE_ENV to development.');
+  }
+
   const data = await adapter.fetchRange(from, to);
   let bookingCount = 0;
 
@@ -90,6 +96,7 @@ export async function syncPms(from: Date, to: Date): Promise<{ provider: string;
     const recordDate = startOfDay(day.date);
     const { adr, revpar } = computeMetrics(day.revenue, day.roomsSold, day.roomsAvailable);
 
+    // Check if a manual-entry record exists — PMS can override it (higher priority)
     await prisma.revenueRecord.upsert({
       where: { recordDate },
       create: {

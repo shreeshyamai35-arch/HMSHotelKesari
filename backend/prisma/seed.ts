@@ -174,6 +174,44 @@ async function main() {
     console.log('  ✓ 30 days revenue + bookings');
   }
 
+  // ─── Occupancy Manager config (room types, rooms, OTAs, Pujaris) ──
+  const roomTypeCount = await prisma.roomType.count();
+  if (roomTypeCount === 0) {
+    for (const name of ['Standard', 'Deluxe', 'Family']) {
+      await prisma.roomType.create({ data: { name } });
+    }
+    console.log('  ✓ 3 room types');
+  }
+
+  const roomCount = await prisma.room.count();
+  if (roomCount === 0) {
+    const standard = await prisma.roomType.findUnique({ where: { name: 'Standard' } });
+    const deluxe = await prisma.roomType.findUnique({ where: { name: 'Deluxe' } });
+    // Floor 1: 101-110 Standard, Floor 2: 201-210 Deluxe.
+    const rooms: { number: string; roomTypeId: string | null }[] = [];
+    for (let n = 101; n <= 110; n++) rooms.push({ number: String(n), roomTypeId: standard?.id ?? null });
+    for (let n = 201; n <= 210; n++) rooms.push({ number: String(n), roomTypeId: deluxe?.id ?? null });
+    for (const r of rooms) {
+      await prisma.room.create({ data: r });
+    }
+    console.log(`  ✓ ${rooms.length} rooms`);
+  }
+
+  const otaCount = await prisma.onlineSource.count();
+  if (otaCount === 0) {
+    for (const name of ['MakeMyTrip', 'Booking.com', 'Agoda', 'Goibibo']) {
+      await prisma.onlineSource.create({ data: { name } });
+    }
+    console.log('  ✓ 4 online sources');
+  }
+
+  await prisma.setting.upsert({
+    where: { key: 'HOTEL_TOTAL_ROOMS' },
+    update: {},
+    create: { key: 'HOTEL_TOTAL_ROOMS', value: '20' },
+  });
+  console.log('  ✓ total rooms setting');
+
   // ─── Revenue target (current month) ─────────────────────
   const now = new Date();
   await prisma.revenueTarget.upsert({
