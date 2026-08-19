@@ -1,0 +1,11 @@
+{
+  "name": "hotel-kesari-hms",
+  "files": [
+    {"file": "vercel.json", "data": "{\"version\":2,\"buildCommand\":\"cd frontend && npm install && npm run build\",\"outputDirectory\":\"frontend/dist\",\"rewrites\":[{\"source\":\"/api/(.*)\",\"destination\":\"/api/index\"},{\"source\":\"/(.*)\",\"destination\":\"/index.html\"}]}"},
+    {"file": "package.json", "data": "{\"name\":\"hotel-kesari-hms\",\"version\":\"1.0.0\"}"}
+  ],
+  "projectSettings": {
+    "framework": null
+  },
+  "target": "production"
+}
