@@ -66,6 +66,7 @@ export interface PdfReport {
 export interface DailyReport {
   id: string;
   reportDate: string;
+  slot: string;
   employeeName: string;
   department?: string | null;
   submittedAt: string;
@@ -95,6 +96,7 @@ export interface DashboardData {
   recentReports: {
     id: string;
     reportDate: string;
+    slot: string;
     employeeName: string;
     department?: string | null;
     submittedAt: string;

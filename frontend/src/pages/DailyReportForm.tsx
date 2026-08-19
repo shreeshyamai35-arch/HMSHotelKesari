@@ -11,12 +11,23 @@ type ChecklistState = { status: string; remarks: string };
 
 const SECTION = 'card space-y-4';
 
+type ReportSlot = 'SLOT_1000' | 'SLOT_1600' | 'SLOT_2200';
+
+/** Pre-select the slot whose submission window is open right now. */
+function currentSlot(): ReportSlot {
+  const hour = new Date().getHours();
+  if (hour >= 22) return 'SLOT_2200';
+  if (hour >= 16) return 'SLOT_1600';
+  return 'SLOT_1000';
+}
+
 export default function DailyReportForm() {
   const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
   const [reportDate, setReportDate] = useState(new Date().toISOString().slice(0, 10));
+  const [slot, setSlot] = useState<ReportSlot>(currentSlot);
   const [remarks, setRemarks] = useState('');
 
   const [genset, setGenset] = useState<Record<string, GensetState>>({
@@ -43,6 +54,7 @@ export default function DailyReportForm() {
     try {
       const payload = {
         reportDate,
+        slot,
         remarks: remarks || null,
         gensetChecks: Object.entries(genset).map(([type, g]) => ({
           type,
@@ -97,6 +109,19 @@ export default function DailyReportForm() {
             value={reportDate}
             onChange={(e) => setReportDate(e.target.value)}
           />
+        </div>
+
+        <div className="card">
+          <label className="label">Time Slot</label>
+          <select
+            className="input max-w-xs"
+            value={slot}
+            onChange={(e) => setSlot(e.target.value as ReportSlot)}
+          >
+            <option value="SLOT_1000">10:00 AM (submit 10:00-11:59)</option>
+            <option value="SLOT_1600">4:00 PM (submit 16:00-17:59)</option>
+            <option value="SLOT_2200">10:00 PM (submit 22:00-23:59)</option>
+          </select>
         </div>
 
         {/* Genset */}

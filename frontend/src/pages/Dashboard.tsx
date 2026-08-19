@@ -14,6 +14,12 @@ import { DashboardData } from '../lib/types';
 import { PageHeader, StatCard, LoadingState, ErrorState, EmptyState } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 
+const slotLabels: Record<string, string> = {
+  SLOT_1000: '10:00 AM',
+  SLOT_1600: '4:00 PM',
+  SLOT_2200: '10:00 PM',
+};
+
 export default function Dashboard() {
   const { user } = useAuth();
   const { data, isLoading, error } = useQuery({
@@ -103,6 +109,7 @@ export default function Dashboard() {
                     <thead>
                       <tr>
                         <th className="table-th">Date</th>
+                        <th className="table-th">Slot</th>
                         <th className="table-th">Employee</th>
                         <th className="table-th">Department</th>
                         <th className="table-th">Submitted</th>
@@ -113,6 +120,7 @@ export default function Dashboard() {
                       {data.recentReports.map((r) => (
                         <tr key={r.id} className="hover:bg-surface-low">
                           <td className="table-td font-medium">{format(new Date(r.reportDate), 'd MMM yyyy')}</td>
+                          <td className="table-td text-on-surface-variant">{slotLabels[r.slot] || r.slot}</td>
                           <td className="table-td">{r.employeeName}</td>
                           <td className="table-td text-on-surface-variant">{r.department ?? '-'}</td>
                           <td className="table-td text-on-surface-variant">

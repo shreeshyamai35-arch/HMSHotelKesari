@@ -9,6 +9,12 @@ import { PageHeader, LoadingState, ErrorState, StatusBadge, Spinner } from '../c
 
 const slotLabel = (slot: string) => WATER_SLOTS.find((s) => s.value === slot)?.label ?? slot;
 
+const reportSlotLabel: Record<string, string> = {
+  SLOT_1000: '10:00 AM',
+  SLOT_1600: '4:00 PM',
+  SLOT_2200: '10:00 PM',
+};
+
 export default function ReportDetail() {
   const { id } = useParams<{ id: string }>();
   const qc = useQueryClient();
@@ -57,7 +63,7 @@ export default function ReportDetail() {
       {data && (
         <>
           <PageHeader
-            title={`Report — ${format(new Date(data.reportDate), 'd MMMM yyyy')}`}
+            title={`Report — ${format(new Date(data.reportDate), 'd MMMM yyyy')} · ${reportSlotLabel[data.slot] || data.slot}`}
             subtitle={`${data.employeeName}${data.department ? ' · ' + data.department : ''} · submitted ${format(
               new Date(data.submittedAt),
               'd MMM, HH:mm'

@@ -33,3 +33,5 @@ backend/storage/pdf/*
 Thumbs.db
 .vercel
 .env*
+
+.env.supabase.local

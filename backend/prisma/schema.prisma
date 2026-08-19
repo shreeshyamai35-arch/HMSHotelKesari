@@ -34,6 +34,7 @@ model User {
 model DailyReport {
   id             String   @id @default(uuid())
   reportDate     DateTime
+  slot           String   // SLOT_1000 | SLOT_1600 | SLOT_2200
   employeeId     String
   employeeName   String
   department     String?
@@ -52,6 +53,7 @@ model DailyReport {
   incidents       Incident[]
   pdfReports      PdfReport[]
 
+  @@unique([reportDate, slot])
   @@index([reportDate])
   @@index([employeeId])
 }

@@ -78,6 +78,7 @@ async function main() {
       await prisma.dailyReport.create({
         data: {
           reportDate,
+          slot: 'SLOT_1000',
           employeeId: frontOfficeId,
           employeeName: 'Front Office',
           department: 'Front Office',

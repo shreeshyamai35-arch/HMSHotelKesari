@@ -54,6 +54,7 @@ router.get(
         select: {
           id: true,
           reportDate: true,
+          slot: true,
           employeeName: true,
           department: true,
           submittedAt: true,
