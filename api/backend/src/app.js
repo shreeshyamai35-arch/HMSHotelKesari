@@ -1,0 +1,61 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.createApp = createApp;
+const express_1 = __importDefault(require("express"));
+const cors_1 = __importDefault(require("cors"));
+const helmet_1 = __importDefault(require("helmet"));
+const morgan_1 = __importDefault(require("morgan"));
+const env_1 = require("./config/env");
+const error_1 = require("./middleware/error");
+const auth_routes_1 = __importDefault(require("./routes/auth.routes"));
+const users_routes_1 = __importDefault(require("./routes/users.routes"));
+const reports_routes_1 = __importDefault(require("./routes/reports.routes"));
+const issues_routes_1 = __importDefault(require("./routes/issues.routes"));
+const dashboard_routes_1 = __importDefault(require("./routes/dashboard.routes"));
+const notifications_routes_1 = __importDefault(require("./routes/notifications.routes"));
+const reviews_routes_1 = __importDefault(require("./routes/reviews.routes"));
+const revenue_routes_1 = __importDefault(require("./routes/revenue.routes"));
+const bookings_routes_1 = __importDefault(require("./routes/bookings.routes"));
+const performance_routes_1 = __importDefault(require("./routes/performance.routes"));
+const pdf_routes_1 = __importDefault(require("./routes/pdf.routes"));
+const ai_routes_1 = __importDefault(require("./routes/ai.routes"));
+const pms_routes_1 = __importDefault(require("./routes/pms.routes"));
+const occupancy_routes_1 = __importDefault(require("./routes/occupancy.routes"));
+const settings_routes_1 = __importDefault(require("./routes/settings.routes"));
+const analytics_routes_1 = __importDefault(require("./routes/analytics.routes"));
+const commissions_routes_1 = __importDefault(require("./routes/commissions.routes"));
+const occupancy_reports_routes_1 = __importDefault(require("./routes/occupancy-reports.routes"));
+function createApp() {
+    const app = (0, express_1.default)();
+    app.use((0, helmet_1.default)());
+    app.use((0, cors_1.default)({ origin: env_1.env.corsOrigin.split(',').map((s) => s.trim()), credentials: true }));
+    app.use(express_1.default.json({ limit: '2mb' }));
+    if (env_1.env.nodeEnv !== 'test') {
+        app.use((0, morgan_1.default)('dev'));
+    }
+    app.get('/api/health', (_req, res) => res.json({ status: 'ok', time: new Date().toISOString() }));
+    app.use('/api/auth', auth_routes_1.default);
+    app.use('/api/users', users_routes_1.default);
+    app.use('/api/reports', reports_routes_1.default);
+    app.use('/api/issues', issues_routes_1.default);
+    app.use('/api/dashboard', dashboard_routes_1.default);
+    app.use('/api/notifications', notifications_routes_1.default);
+    app.use('/api/reviews', reviews_routes_1.default);
+    app.use('/api/revenue', revenue_routes_1.default);
+    app.use('/api/bookings', bookings_routes_1.default);
+    app.use('/api/performance', performance_routes_1.default);
+    app.use('/api/pdf', pdf_routes_1.default);
+    app.use('/api/ai', ai_routes_1.default);
+    app.use('/api/pms', pms_routes_1.default);
+    app.use('/api/occupancy', occupancy_routes_1.default);
+    app.use('/api/settings', settings_routes_1.default);
+    app.use('/api/analytics', analytics_routes_1.default);
+    app.use('/api/commissions', commissions_routes_1.default);
+    app.use('/api/occupancy-reports', occupancy_reports_routes_1.default);
+    app.use(error_1.notFoundHandler);
+    app.use(error_1.errorHandler);
+    return app;
+}

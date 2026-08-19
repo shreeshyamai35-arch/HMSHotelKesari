@@ -23,6 +23,9 @@ run('npm install', backend);
 run('npx prisma generate', backend);
 run('npx tsc -p tsconfig.json', backend);
 
+// Build api serverless function
+run('npx --package=typescript tsc api/index.ts --outDir api --module commonjs --esModuleInterop true --skipLibCheck true', root);
+
 // Build frontend
 run('npm install', frontend);
 run('npm run build', frontend);
