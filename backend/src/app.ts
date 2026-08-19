@@ -27,6 +27,9 @@ import occupancyReportsRoutes from './routes/occupancy-reports.routes';
 export function createApp() {
   const app = express();
 
+  // Trust proxy for Vercel serverless deployment
+  app.set('trust proxy', 1);
+
   app.use(helmet());
   app.use(cors({ origin: env.corsOrigin.split(',').map((s) => s.trim()), credentials: true }));
   app.use(express.json({ limit: '2mb' }));
