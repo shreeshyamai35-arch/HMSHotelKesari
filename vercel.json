@@ -3,11 +3,6 @@
   "buildCommand": "node build-vercel.js",
   "installCommand": "echo skip",
   "outputDirectory": "frontend/dist",
-  "functions": {
-    "api/index.js": {
-      "maxDuration": 30
-    }
-  },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index" },
     { "source": "/(.*)", "destination": "/index.html" }
