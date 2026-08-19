@@ -25,6 +25,8 @@ export default function Dashboard() {
   const { data, isLoading, error } = useQuery({
     queryKey: ['dashboard'],
     queryFn: async () => (await api.get<DashboardData>('/dashboard')).data,
+    staleTime: 30000, // Cache for 30 seconds
+    refetchOnWindowFocus: false,
   });
 
   return (

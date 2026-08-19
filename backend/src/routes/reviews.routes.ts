@@ -68,12 +68,18 @@ router.delete(
 router.get(
   '/analytics',
   asyncHandler(async (_req, res) => {
-    const reviews = await prisma.review.findMany();
+    const [reviews, openComplaints, closedComplaints] = await Promise.all([
+      prisma.review.findMany({ select: { source: true, rating: true } }),
+      prisma.complaint.count({ where: { status: 'OPEN' } }),
+      prisma.complaint.count({ where: { status: 'CLOSED' } }),
+    ]);
+
     const total = reviews.length;
     const avgRating = total ? reviews.reduce((s, r) => s + r.rating, 0) / total : 0;
 
     const bySource: Record<string, { count: number; avg: number }> = {};
     const distribution: Record<string, number> = { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 };
+    let negativeCount = 0;
 
     for (const r of reviews) {
       const src = r.source;
@@ -82,23 +88,18 @@ router.get(
       bySource[src].avg += r.rating;
       const bucket = String(Math.min(5, Math.max(1, Math.round(r.rating))));
       distribution[bucket] = (distribution[bucket] ?? 0) + 1;
+      if (r.rating <= 2) negativeCount++;
     }
     Object.keys(bySource).forEach((k) => {
       bySource[k].avg = bySource[k].count ? +(bySource[k].avg / bySource[k].count).toFixed(2) : 0;
     });
-
-    // Complaint analysis (operational complaints)
-    const [openComplaints, closedComplaints] = await Promise.all([
-      prisma.complaint.count({ where: { status: 'OPEN' } }),
-      prisma.complaint.count({ where: { status: 'CLOSED' } }),
-    ]);
 
     res.json({
       total,
       avgRating: +avgRating.toFixed(2),
       bySource,
       distribution,
-      negativeCount: reviews.filter((r) => r.rating <= 2).length,
+      negativeCount,
       complaints: { open: openComplaints, closed: closedComplaints },
     });
   })

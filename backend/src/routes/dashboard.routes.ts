@@ -17,14 +17,32 @@ router.get(
     const dayStart = startOfDay(now);
     const dayEnd = endOfDay(now);
 
-    const todaysReports = await prisma.dailyReport.findMany({
-      where: { reportDate: { gte: dayStart, lte: dayEnd } },
-      include: {
-        gensetChecks: true,
-        waterTankChecks: true,
-        checklistItems: true,
-      },
-    });
+    // Run all queries in parallel for faster response
+    const [todaysReports, openComplaints, openMaintenance, recentReports] = await Promise.all([
+      prisma.dailyReport.findMany({
+        where: { reportDate: { gte: dayStart, lte: dayEnd } },
+        select: {
+          id: true,
+          gensetChecks: { select: { type: true } },
+          waterTankChecks: { select: { slot: true } },
+          checklistItems: { select: { id: true } },
+        },
+      }),
+      prisma.complaint.count({ where: { status: 'OPEN' } }),
+      prisma.maintenanceIssue.count({ where: { status: 'OPEN' } }),
+      prisma.dailyReport.findMany({
+        orderBy: { submittedAt: 'desc' },
+        take: 8,
+        select: {
+          id: true,
+          reportDate: true,
+          slot: true,
+          employeeName: true,
+          department: true,
+          submittedAt: true,
+        },
+      }),
+    ]);
 
     // Scheduled tasks expected per day: 2 genset + 4 water tank = 6
     const EXPECTED_GENSET = 2;
@@ -44,24 +62,6 @@ router.get(
     const totalScheduled = EXPECTED_GENSET + EXPECTED_WATER;
     const pendingScheduled = Math.max(0, totalScheduled - completedScheduled);
 
-    const [openComplaints, openMaintenance, totalReportsToday, recentReports] = await Promise.all([
-      prisma.complaint.count({ where: { status: 'OPEN' } }),
-      prisma.maintenanceIssue.count({ where: { status: 'OPEN' } }),
-      prisma.dailyReport.count({ where: { reportDate: { gte: dayStart, lte: dayEnd } } }),
-      prisma.dailyReport.findMany({
-        orderBy: { submittedAt: 'desc' },
-        take: 8,
-        select: {
-          id: true,
-          reportDate: true,
-          slot: true,
-          employeeName: true,
-          department: true,
-          submittedAt: true,
-        },
-      }),
-    ]);
-
     res.json({
       date: dayStart,
       checklist: {
@@ -72,7 +72,7 @@ router.get(
         waterDone: Array.from(waterSlotsDone),
         checklistItemsDone: checklistDone,
       },
-      reportsSubmittedToday: totalReportsToday,
+      reportsSubmittedToday: todaysReports.length,
       openComplaints,
       openMaintenance,
       recentReports,

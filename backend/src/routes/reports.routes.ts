@@ -176,7 +176,16 @@ router.get(
 
     const reports = await prisma.dailyReport.findMany({
       where,
-      include: reportInclude,
+      select: {
+        id: true,
+        reportDate: true,
+        slot: true,
+        employeeId: true,
+        employeeName: true,
+        department: true,
+        submittedAt: true,
+        remarks: true,
+      },
       orderBy: { reportDate: 'desc' },
       take: 200,
     });

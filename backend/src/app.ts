@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import compression from 'compression';
 import { env } from './config/env';
 import { notFoundHandler, errorHandler } from './middleware/error';
 
@@ -30,9 +31,17 @@ export function createApp() {
   // Trust proxy for Vercel serverless deployment
   app.set('trust proxy', 1);
 
+  app.use(compression());
   app.use(helmet());
   app.use(cors({ origin: env.corsOrigin.split(',').map((s) => s.trim()), credentials: true }));
   app.use(express.json({ limit: '2mb' }));
+
+  // Cache control for API responses
+  app.use((req, res, next) => {
+    res.setHeader('Cache-Control', 'public, max-age=30');
+    next();
+  });
+
   if (env.nodeEnv !== 'test') {
     app.use(morgan('dev'));
   }
