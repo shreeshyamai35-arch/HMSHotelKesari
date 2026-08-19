@@ -35,7 +35,7 @@ console.log('Generating Prisma Client...');
 run('npx prisma generate', backend);
 
 console.log('Compiling TypeScript...');
-run('npx --package=typescript tsc -p tsconfig.json', backend);
+run('npx tsc -p tsconfig.json', backend);
 
 // Build frontend
 run('npm install', frontend);
