@@ -35,7 +35,12 @@ console.log('Generating Prisma Client...');
 run('npx prisma generate', backend);
 
 console.log('Compiling TypeScript...');
-run('npx tsc -p tsconfig.json', backend);
+// Use platform-appropriate path separator for tsc binary
+const isWin = process.platform === 'win32';
+const tscBin = isWin
+  ? path.join(backend, 'node_modules', '.bin', 'tsc.cmd')
+  : path.join(backend, 'node_modules', '.bin', 'tsc');
+run(`"${tscBin}" -p tsconfig.json`, backend);
 
 // Build frontend
 run('npm install', frontend);
