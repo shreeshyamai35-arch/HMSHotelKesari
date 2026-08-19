@@ -1,7 +1,14 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 
 const prisma = new PrismaClient();
+
+// Production guard: disable seeding in production
+if (process.env.NODE_ENV === 'production') {
+  console.log('Seed disabled in production');
+  process.exit(0);
+}
 
 const CHECKLIST_ITEMS = [
   { key: 'MAIN_ELECTRICITY', label: 'Main Electricity Supply Working' },
@@ -35,11 +42,12 @@ async function main() {
   console.log('Seeding database...');
 
   // ─── Users ──────────────────────────────────────────────
+  const adminPassword = crypto.randomBytes(16).toString('hex');
   const users = [
-    { name: 'Admin User', email: 'admin@hotelkesari.com', password: 'Admin@123', role: 'ADMIN', department: 'Management' },
-    { name: 'Front Office', email: 'frontoffice@hotelkesari.com', password: 'Front@123', role: 'FRONT_OFFICE', department: 'Front Office' },
-    { name: 'Revenue Team', email: 'revenue@hotelkesari.com', password: 'Revenue@123', role: 'REVENUE', department: 'Revenue' },
-    { name: 'Management', email: 'management@hotelkesari.com', password: 'Manage@123', role: 'MANAGEMENT', department: 'Management' },
+    { name: 'Admin User', email: 'admin@hotelkesari.com', password: adminPassword, role: 'ADMIN', department: 'Management' },
+    { name: 'Front Office', email: 'frontoffice@hotelkesari.com', password: crypto.randomBytes(16).toString('hex'), role: 'FRONT_OFFICE', department: 'Front Office' },
+    { name: 'Revenue Team', email: 'revenue@hotelkesari.com', password: crypto.randomBytes(16).toString('hex'), role: 'REVENUE', department: 'Revenue' },
+    { name: 'Management', email: 'management@hotelkesari.com', password: crypto.randomBytes(16).toString('hex'), role: 'MANAGEMENT', department: 'Management' },
   ];
 
   const created: Record<string, string> = {};
@@ -58,6 +66,7 @@ async function main() {
     created[u.role] = user.id;
   }
   console.log(`  ✓ ${users.length} users`);
+  console.log(`\n  🔑 ADMIN PASSWORD (save this): ${adminPassword}\n`);
 
   const frontOfficeId = created['FRONT_OFFICE'];
 
@@ -222,8 +231,10 @@ async function main() {
   console.log('  ✓ revenue target');
 
   console.log('Seed complete.\n');
-  console.log('  Login accounts:');
-  users.forEach((u) => console.log(`    ${u.role.padEnd(13)} ${u.email}  /  ${u.password}`));
+  console.log('  🔑 Login with admin account:');
+  console.log(`    Email: admin@hotelkesari.com`);
+  console.log(`    Password: ${adminPassword}`);
+  console.log(`\n  Other accounts have randomly generated passwords (check logs above if needed).`);
 }
 
 main()

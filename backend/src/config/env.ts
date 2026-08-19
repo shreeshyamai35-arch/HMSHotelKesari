@@ -13,12 +13,19 @@ function required(key: string, fallback?: string): string {
 // Set timezone to IST before any date operations
 process.env.TZ = process.env.TZ ?? 'Asia/Kolkata';
 
+const isProd = (process.env.NODE_ENV ?? 'development') === 'production';
+
+// Fail hard if JWT_SECRET is missing in production
+if (!process.env.JWT_SECRET && isProd) {
+  throw new Error('JWT_SECRET is required in production');
+}
+
 export const env = {
   nodeEnv: process.env.NODE_ENV ?? 'development',
   port: parseInt(process.env.PORT ?? '4000', 10),
   corsOrigin: process.env.CORS_ORIGIN ?? 'http://localhost:5173',
 
-  jwtSecret: required('JWT_SECRET', 'dev-secret-change-me'),
+  jwtSecret: required('JWT_SECRET', isProd ? undefined : 'dev-secret-change-me'),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '7d',
 
   databaseUrl: required('DATABASE_URL', 'file:./dev.db'),
@@ -47,6 +54,6 @@ export const env = {
   checkGraceMinutes: parseInt(process.env.CHECK_GRACE_MINUTES ?? '60', 10),
   enableCron: (process.env.ENABLE_CRON ?? 'true') === 'true',
 
-  isProd: (process.env.NODE_ENV ?? 'development') === 'production',
+  isProd,
   timezone: process.env.TZ!,
 };

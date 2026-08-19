@@ -4,13 +4,6 @@ import { useAuth } from '../context/AuthContext';
 import { apiError } from '../lib/api';
 import { Spinner } from '../components/ui';
 
-const DEMO = [
-  { role: 'Admin', email: 'admin@hotelkesari.com', password: 'Admin@123' },
-  { role: 'Front Office', email: 'frontoffice@hotelkesari.com', password: 'Front@123' },
-  { role: 'Revenue', email: 'revenue@hotelkesari.com', password: 'Revenue@123' },
-  { role: 'Management', email: 'management@hotelkesari.com', password: 'Manage@123' },
-];
-
 export default function Login() {
   const { user, login } = useAuth();
   const [email, setEmail] = useState('');
@@ -99,26 +92,6 @@ export default function Login() {
               Sign in
             </button>
           </form>
-
-          <div className="mt-8 rounded-md border border-outline-variant bg-surface-low p-4">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Demo accounts</p>
-            <div className="grid grid-cols-2 gap-2">
-              {DEMO.map((d) => (
-                <button
-                  key={d.email}
-                  type="button"
-                  onClick={() => {
-                    setEmail(d.email);
-                    setPassword(d.password);
-                  }}
-                  className="rounded border border-outline-variant bg-surface-lowest px-2 py-1.5 text-left text-xs hover:border-navy"
-                >
-                  <span className="block font-medium text-navy">{d.role}</span>
-                  <span className="block truncate text-on-surface-variant">{d.email}</span>
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
       </div>
     </div>
