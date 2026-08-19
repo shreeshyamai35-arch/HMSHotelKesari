@@ -2,13 +2,15 @@
   "version": 2,
   "buildCommand": "cd frontend && npm install && npm run build",
   "outputDirectory": "frontend/dist",
+  "installCommand": "npm --prefix backend install",
   "functions": {
-    "backend/api/index.ts": {
-      "includeFiles": "backend/prisma/**"
+    "api/index.ts": {
+      "runtime": "nodejs20.x",
+      "includeFiles": "backend/**"
     }
   },
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/backend/api/index.ts" },
+    { "source": "/api/(.*)", "destination": "/api/index" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
