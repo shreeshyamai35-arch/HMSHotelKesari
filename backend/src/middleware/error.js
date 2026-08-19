@@ -2,8 +2,8 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.notFoundHandler = notFoundHandler;
 exports.errorHandler = errorHandler;
-var zod_1 = require("zod");
-var errors_1 = require("../lib/errors");
+const zod_1 = require("zod");
+const errors_1 = require("../lib/errors");
 function notFoundHandler(_req, res) {
     res.status(404).json({ error: 'Route not found' });
 }
@@ -12,18 +12,18 @@ function errorHandler(err, _req, res, _next) {
     if (err instanceof zod_1.ZodError) {
         return res.status(400).json({
             error: 'Validation failed',
-            details: err.issues.map(function (i) { return ({ path: i.path.join('.'), message: i.message }); }),
+            details: err.issues.map((i) => ({ path: i.path.join('.'), message: i.message })),
         });
     }
     if (err instanceof errors_1.AppError) {
         return res.status(err.statusCode).json({ error: err.message, details: err.details });
     }
     // Prisma known errors surface as objects with a `code`
-    var anyErr = err;
-    if ((anyErr === null || anyErr === void 0 ? void 0 : anyErr.code) === 'P2002') {
+    const anyErr = err;
+    if (anyErr?.code === 'P2002') {
         return res.status(409).json({ error: 'A record with these unique values already exists' });
     }
-    if ((anyErr === null || anyErr === void 0 ? void 0 : anyErr.code) === 'P2025') {
+    if (anyErr?.code === 'P2025') {
         return res.status(404).json({ error: 'Record not found' });
     }
     console.error('[Unhandled error]', err);
