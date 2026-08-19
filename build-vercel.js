@@ -5,10 +5,14 @@ const path = require('path');
 function run(cmd, cwd) {
   console.log(`Running: ${cmd} in ${cwd}`);
   try {
-    execSync(cmd, { cwd, stdio: 'inherit' });
+    const result = execSync(cmd, { cwd, stdio: 'pipe', encoding: 'utf-8' });
+    console.log(result);
+    return result;
   } catch (error) {
     console.error(`Command failed: ${cmd}`);
     console.error(`Exit code: ${error.status}`);
+    console.error(`stdout: ${error.stdout}`);
+    console.error(`stderr: ${error.stderr}`);
     console.error(`Error: ${error.message}`);
     process.exit(error.status || 1);
   }
@@ -24,7 +28,7 @@ run('npx prisma generate', backend);
 run('npx tsc -p tsconfig.json', backend);
 
 // Build api serverless function
-run('npx --package=typescript tsc api/index.ts --outDir api --module commonjs --esModuleInterop true --skipLibCheck true', root);
+run('npx --package=typescript@5.9.3 tsc api/index.ts --outDir api --module commonjs --esModuleInterop true --skipLibCheck true', root);
 
 // Build frontend
 run('npm install', frontend);
