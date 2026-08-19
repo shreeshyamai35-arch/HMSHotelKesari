@@ -32,23 +32,7 @@ console.log('DATABASE_URL for build:', process.env.DATABASE_URL.replace(/:[^:@]+
 console.log('DIRECT_URL for build:', process.env.DIRECT_URL.replace(/:[^:@]+@/, ':***@'));
 
 console.log('Generating Prisma Client...');
-try {
-  const output = execSync('npx prisma generate', {
-    cwd: backend,
-    stdio: ['pipe', 'pipe', 'pipe'],
-    encoding: 'utf-8',
-    env: { ...process.env }
-  });
-  console.log(output);
-  console.log('Prisma Client generated successfully');
-} catch (error) {
-  console.error('Prisma generate failed!');
-  console.error('Error:', error.message);
-  console.error('Exit code:', error.status);
-  if (error.stderr) console.error('stderr:', error.stderr);
-  if (error.stdout) console.error('stdout:', error.stdout);
-  process.exit(1);
-}
+run('npx prisma generate', backend);
 
 console.log('Compiling TypeScript...');
 run('npx tsc -p tsconfig.json', backend);
