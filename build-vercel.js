@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 const { execSync } = require('child_process');
+const fs = require('fs');
 const path = require('path');
 
 function run(cmd, cwd) {
@@ -40,5 +41,26 @@ run('node node_modules/typescript/lib/tsc.js -p tsconfig.json', backend);
 // Build frontend
 run('npm install', frontend);
 run('npm run build', frontend);
+
+// Create Vercel output structure for serverless function
+console.log('Creating serverless function structure...');
+const funcDir = path.join(root, '.vercel', 'output', 'functions', 'api', 'index.func');
+fs.mkdirSync(funcDir, { recursive: true });
+
+// Copy API handler
+fs.copyFileSync(
+  path.join(root, 'api', 'index.js'),
+  path.join(funcDir, 'index.js')
+);
+
+// Write function config
+fs.writeFileSync(
+  path.join(funcDir, '.vc-config.json'),
+  JSON.stringify({
+    runtime: 'nodejs20.x',
+    handler: 'index.js',
+    launcherType: 'Nodejs'
+  }, null, 2)
+);
 
 console.log('Build complete!');
