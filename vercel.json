@@ -1,26 +1,20 @@
 {
+  "version": 2,
+  "buildCommand": "cd backend && npm install && cd ../frontend && npm install && npm run build",
+  "outputDirectory": "frontend/dist",
+  "functions": {
+    "api/index.ts": {
+      "runtime": "nodejs20.x"
+    }
+  },
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/api/index"
+      "destination": "/api/index.ts"
     },
     {
       "source": "/(.*)",
       "destination": "/index.html"
-    },
-    {
-      "source": "/(.*)",
-      "destination": {
-        "type": "service",
-        "service": "kesariweb"
-      }
     }
-  ],
-  "services": {
-    "kesariweb": {
-      "root": "frontend",
-      "framework": "vite",
-      "buildCommand": "npm install && npm run build"
-    }
-  }
+  ]
 }
